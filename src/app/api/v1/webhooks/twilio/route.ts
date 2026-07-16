@@ -159,14 +159,28 @@ export async function POST(request: NextRequest) {
             console.warn(`[twilio-webhook] Unhandled CallStatus: ${callStatus}`);
         }
 
-        // Log to audit_events
-        const { error: auditError } = await fromUntypedTable(supabase, 'audit_events').insert({
-          resource_id: callSid,
-          action: eventKey,
-          metadata: params,
-          created_at: new Date().toISOString(),
-        });
-        if (auditError) throw new Error(auditError.message);
+        // Log to audit_events (tenant_id is NOT NULL — resolve it via the
+        // calls row, which by this point exists from either this handler's
+        // own upsert above or the /voice webhook that answered the call).
+        const { data: callRow } = await fromUntypedTable(supabase, 'calls')
+          .select('tenant_id')
+          .eq('provider_call_id', callSid)
+          .maybeSingle();
+        const auditTenantId = (callRow as { tenant_id?: string } | null)?.tenant_id;
+
+        if (auditTenantId) {
+          const { error: auditError } = await fromUntypedTable(supabase, 'audit_events').insert({
+            tenant_id: auditTenantId,
+            resource_id: callSid,
+            resource_type: 'call',
+            action: eventKey,
+            metadata: params,
+            created_at: new Date().toISOString(),
+          });
+          if (auditError) throw new Error(auditError.message);
+        } else {
+          console.warn(`[twilio-webhook] no tenant_id resolvable for call ${callSid} — skipping audit log`);
+        }
       },
       { maxAttempts: 3, backoffMs: 250, label: 'twilio-webhook-process' }
     );
