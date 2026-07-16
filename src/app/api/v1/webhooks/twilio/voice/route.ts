@@ -59,7 +59,11 @@ export async function POST(request: NextRequest) {
   const twilioSignature = request.headers.get('x-twilio-signature');
 
   if (authToken) {
-    if (!twilioSignature || !validateTwilioSignature(request.url, params, twilioSignature, authToken)) {
+    // Behind Traefik/reverse-proxy, request.url reflects the internal
+    // container URL (e.g. https://localhost:3000/...), not the public URL
+    // Twilio actually signed against — reconstruct from the known app URL.
+    const requestUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}${request.nextUrl.pathname}`;
+    if (!twilioSignature || !validateTwilioSignature(requestUrl, params, twilioSignature, authToken)) {
       logger.warn('twilio-voice-webhook: invalid or missing signature');
       return new NextResponse('Forbidden', { status: 403 });
     }

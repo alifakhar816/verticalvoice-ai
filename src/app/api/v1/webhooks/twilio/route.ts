@@ -62,7 +62,10 @@ export async function POST(request: NextRequest) {
     if (!twilioSignature) {
       return NextResponse.json({ error: 'Missing signature' }, { status: 401 });
     }
-    const requestUrl = request.url;
+    // Behind Traefik/reverse-proxy, request.url reflects the internal
+    // container URL (e.g. https://localhost:3000/...), not the public URL
+    // Twilio actually signed against — reconstruct from the known app URL.
+    const requestUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}${request.nextUrl.pathname}`;
     if (!validateTwilioSignature(authToken, requestUrl, params, twilioSignature)) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 });
     }
