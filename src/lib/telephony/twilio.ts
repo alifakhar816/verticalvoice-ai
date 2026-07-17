@@ -55,3 +55,36 @@ export async function placeOutboundCall(params: {
   const data = (await res.json()) as { sid: string; status: string };
   return { sid: data.sid, status: data.status };
 }
+
+/**
+ * Redirects an in-progress Twilio call to a new TwiML instruction — used by
+ * the transfer_call tool to bridge a live AI call to a human staff member's
+ * number mid-conversation.
+ */
+export async function redirectLiveCall(callSid: string, dialToNumber: string): Promise<void> {
+  const accountSid = process.env.TWILIO_ACCOUNT_SID;
+  const authToken = process.env.TWILIO_AUTH_TOKEN;
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  if (!accountSid || !authToken) {
+    throw new Error('TWILIO_ACCOUNT_SID / TWILIO_AUTH_TOKEN are not configured');
+  }
+
+  const twiml = `<?xml version="1.0" encoding="UTF-8"?><Response><Say>Connecting you now, please hold.</Say><Dial callerId="${fromNumber ?? ''}">${dialToNumber}</Dial></Response>`;
+
+  const res = await fetch(
+    `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Calls/${callSid}.json`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        Authorization: `Basic ${Buffer.from(`${accountSid}:${authToken}`).toString('base64')}`,
+      },
+      body: new URLSearchParams({ Twiml: twiml }),
+    }
+  );
+
+  if (!res.ok) {
+    const text = await res.text().catch(() => '');
+    throw new Error(`Twilio call redirect failed: ${res.status} ${text}`);
+  }
+}

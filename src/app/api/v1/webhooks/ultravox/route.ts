@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/database/supabase-admin';
 import { fromUntypedTable } from '@/lib/database/untyped-table';
 import { withRetry } from '@/lib/jobs/retry';
 import { moveToDeadLetter } from '@/lib/jobs/dead-letter';
+import { summarizeCall } from '@/lib/calls/summarize';
 
 export async function POST(request: NextRequest) {
   const supabase = createAdminClient();
@@ -84,6 +85,15 @@ export async function POST(request: NextRequest) {
                 updated_at: new Date().toISOString(),
               })
               .eq('provider_call_id', call_id);
+
+            const { data: endedCall } = await fromUntypedTable(supabase, 'calls')
+              .select('id, tenant_id')
+              .eq('provider_call_id', call_id)
+              .maybeSingle();
+            const endedCallRow = endedCall as { id: string; tenant_id: string } | null;
+            if (endedCallRow) {
+              await summarizeCall(supabase, endedCallRow.id, endedCallRow.tenant_id);
+            }
             break;
           }
 
@@ -100,16 +110,18 @@ export async function POST(request: NextRequest) {
           case 'transcript.ready': {
             const transcript = data?.transcript as string | undefined;
             if (transcript) {
-              // Look up the call to get its id
+              // Look up the call to get its id — the real table is
+              // call_transcripts (NOT 'transcripts', which doesn't exist).
               const { data: call } = await fromUntypedTable(supabase, 'calls')
-                .select('id')
+                .select('id, tenant_id')
                 .eq('provider_call_id', call_id)
                 .single();
 
               if (call) {
-                const callId = (call as { id: string }).id;
-                await fromUntypedTable(supabase, 'transcripts').insert({
-                  call_id: callId,
+                const callRow = call as { id: string; tenant_id: string };
+                await fromUntypedTable(supabase, 'call_transcripts').insert({
+                  call_id: callRow.id,
+                  tenant_id: callRow.tenant_id,
                   content: transcript,
                   created_at: new Date().toISOString(),
                 });
