@@ -7,14 +7,10 @@ import {
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import Link from "next/link";
 import {
   Activity,
   Phone,
-  PhoneCall,
-  Target,
-  Clock,
   PhoneOutgoing,
   BarChart3,
   Settings,
@@ -22,7 +18,9 @@ import {
 import { createServerClient } from "@/lib/database/supabase-server";
 import { getCurrentTenantId } from "@/domain/tenants/current";
 import { getAgentConfig } from "@/domain/agents/service";
+import { LiveCallOrb } from "@/components/shared/live-call-orb";
 import type { Json } from "@/lib/database/types";
+import { OverviewStats } from "./overview-stats";
 
 interface AgentSnapshot {
   business_name?: string;
@@ -57,6 +55,21 @@ function formatCallTime(iso: string, timeZone: string): string {
   });
 }
 
+/** Maps a tenant industry to its jewel accent CSS variable, else brass. */
+function verticalAccent(industry: string | null | undefined): string {
+  switch (industry) {
+    case "healthcare":
+      return "var(--vertical-healthcare)";
+    case "restaurant":
+      return "var(--vertical-restaurant)";
+    case "real_estate":
+    case "realestate":
+      return "var(--vertical-realestate)";
+    default:
+      return "var(--brand)";
+  }
+}
+
 function callStatusLabel(status: string): string {
   switch (status) {
     case "completed":
@@ -76,40 +89,35 @@ function callStatusLabel(status: string): string {
   }
 }
 
-function callStatusBadge(status: string) {
-  switch (status) {
-    case "completed":
-      return (
-        <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400">
-          {callStatusLabel(status)}
-        </Badge>
-      );
-    case "failed":
-    case "no_answer":
-      return (
-        <Badge variant="outline" className="border-red-500/50 text-red-600 dark:text-red-400">
-          {callStatusLabel(status)}
-        </Badge>
-      );
-    case "busy":
-      return (
-        <Badge variant="outline" className="border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
-          {callStatusLabel(status)}
-        </Badge>
-      );
-    default:
-      return <Badge variant="secondary">{callStatusLabel(status)}</Badge>;
-  }
+/** Status pill: semantic tint + solid text + a dot, never color alone. */
+function StatusPill({ status }: { status: string }) {
+  const variant: "success" | "warning" | "destructive" | "outline" =
+    status === "completed"
+      ? "success"
+      : status === "failed" || status === "no_answer"
+        ? "destructive"
+        : status === "busy" || status === "in_progress" || status === "ringing"
+          ? "warning"
+          : "outline";
+
+  const dotClass = variant === "outline" ? "bg-muted-foreground" : "bg-current";
+
+  return (
+    <Badge variant={variant} className="gap-1.5">
+      <span className={`inline-block size-1.5 rounded-full ${dotClass}`} aria-hidden="true" />
+      {callStatusLabel(status)}
+    </Badge>
+  );
 }
 
 function integrationDot(status: string) {
   const color =
     status === "connected" || status === "active"
-      ? "bg-green-500"
+      ? "bg-success"
       : status === "error" || status === "disconnected"
-        ? "bg-red-500"
-        : "bg-yellow-500";
-  return <span className={`inline-block size-2 rounded-full ${color}`} />;
+        ? "bg-destructive"
+        : "bg-warning";
+  return <span className={`inline-block size-2 rounded-full ${color}`} aria-hidden="true" />;
 }
 
 function NoTenantState() {
@@ -209,6 +217,8 @@ export default async function OverviewPage() {
     durations.length > 0 ? durations.reduce((sum, d) => sum + d, 0) / durations.length : 0;
 
   const recentCalls = recentCallsRaw ?? [];
+  const accent = verticalAccent(tenant?.industry);
+  const industryLabel = tenant?.industry?.replace(/_/g, " ") ?? "Unknown";
 
   return (
     <div className="space-y-6">
@@ -221,7 +231,7 @@ export default async function OverviewPage() {
 
       {/* Agent Status Card */}
       <Card>
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+        <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
           <div>
             <CardTitle>Agent Status</CardTitle>
             <CardDescription>
@@ -229,81 +239,60 @@ export default async function OverviewPage() {
             </CardDescription>
           </div>
           {activeConfig ? (
-            <Badge variant="outline" className="border-green-500 text-green-600 dark:text-green-400">
-              <span className="mr-1 inline-block size-2 rounded-full bg-green-500" />
+            <Badge variant="success" className="gap-1.5">
+              <span className="inline-block size-1.5 rounded-full bg-current" aria-hidden="true" />
               Active
             </Badge>
           ) : (
-            <Badge variant="outline" className="text-muted-foreground">
-              <span className="mr-1 inline-block size-2 rounded-full bg-muted-foreground" />
+            <Badge variant="outline" className="gap-1.5 text-muted-foreground">
+              <span className="inline-block size-1.5 rounded-full bg-muted-foreground" aria-hidden="true" />
               Not configured
             </Badge>
           )}
         </CardHeader>
         <CardContent>
-          <div className="flex flex-wrap gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <Phone className="size-4 text-muted-foreground" aria-hidden="true" />
-              <span className="text-muted-foreground">Phone:</span>
-              <span className="font-medium">{activeNumber?.number ?? "No number assigned"}</span>
-            </div>
-            <div className="flex items-center gap-2">
-              <Activity className="size-4 text-muted-foreground" aria-hidden="true" />
-              <span className="text-muted-foreground">Industry:</span>
-              <span className="font-medium capitalize">
-                {tenant?.industry?.replace(/_/g, " ") ?? "Unknown"}
-              </span>
-            </div>
-            {snapshot?.voice?.provider && (
+          <div className="flex flex-col gap-6 sm:flex-row sm:items-center sm:gap-8">
+            <LiveCallOrb
+              size="sm"
+              state={activeConfig ? "live" : "idle"}
+              accent={accent}
+              showTimer={false}
+            />
+            <div className="flex flex-wrap gap-x-8 gap-y-4 text-sm">
               <div className="flex items-center gap-2">
-                <span className="text-muted-foreground">Voice:</span>
-                <span className="font-medium">
-                  {snapshot.voice.provider}
-                  {snapshot.voice.voice_id ? ` · ${snapshot.voice.voice_id}` : ""}
+                <Phone className="size-4 text-muted-foreground" aria-hidden="true" />
+                <span className="text-muted-foreground">Phone</span>
+                <span className="font-mono font-medium tabular-nums">
+                  {activeNumber?.number ?? "No number assigned"}
                 </span>
               </div>
-            )}
+              <div className="flex items-center gap-2">
+                <Activity className="size-4 text-muted-foreground" aria-hidden="true" />
+                <span className="text-muted-foreground">Industry</span>
+                <span className="font-medium capitalize">{industryLabel}</span>
+              </div>
+              {snapshot?.voice?.provider && (
+                <div className="flex items-center gap-2">
+                  <span className="text-muted-foreground">Voice</span>
+                  <span className="font-medium">
+                    {snapshot.voice.provider}
+                    {snapshot.voice.voice_id ? ` · ${snapshot.voice.voice_id}` : ""}
+                  </span>
+                </div>
+              )}
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Stats */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Calls Handled</CardTitle>
-            <PhoneCall className="size-4 text-muted-foreground" aria-hidden="true" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{callsToday.length}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Today</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Resolution Rate</CardTitle>
-            <Target className="size-4 text-muted-foreground" aria-hidden="true" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{resolutionRate}%</div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              {completedCalls} of {totalCalls} calls completed (all time)
-            </p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Avg Duration</CardTitle>
-            <Clock className="size-4 text-muted-foreground" aria-hidden="true" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">{formatDuration(avgDurationSeconds)}</div>
-            <p className="mt-1 text-xs text-muted-foreground">Per call, all time</p>
-          </CardContent>
-        </Card>
-      </div>
+      {/* Stats (count up on mount) */}
+      <OverviewStats
+        callsToday={callsToday.length}
+        resolutionRate={resolutionRate}
+        completedCalls={completedCalls}
+        totalCalls={totalCalls}
+        avgDurationSeconds={avgDurationSeconds}
+      />
 
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Recent Calls */}
@@ -316,33 +305,33 @@ export default async function OverviewPage() {
             {recentCalls.length === 0 ? (
               <p className="py-6 text-center text-sm text-muted-foreground">No calls yet.</p>
             ) : (
-              <div className="space-y-3">
-                {recentCalls.map((call, i) => (
-                  <div key={call.id}>
-                    <div className="flex items-center justify-between py-1">
-                      <div className="flex items-center gap-4">
-                        <span className="w-32 text-sm text-muted-foreground">
-                          {formatCallTime(call.started_at, tenantTimezone)}
-                        </span>
-                        <div>
-                          <p className="text-sm font-medium">
-                            {call.caller_number ?? "Unknown number"}
-                          </p>
-                          <p className="text-xs capitalize text-muted-foreground">
-                            {call.direction}
-                          </p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-sm text-muted-foreground">
-                          {call.duration_seconds != null
-                            ? formatDuration(call.duration_seconds)
-                            : "--"}
-                        </span>
-                        {callStatusBadge(call.status)}
+              <div className="-mx-2">
+                {recentCalls.map((call) => (
+                  <div
+                    key={call.id}
+                    className="flex items-center justify-between gap-4 border-b border-border px-2 py-3 last:border-0"
+                  >
+                    <div className="flex min-w-0 items-center gap-4">
+                      <span className="w-28 shrink-0 font-mono text-xs tabular-nums text-muted-foreground">
+                        {formatCallTime(call.started_at, tenantTimezone)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="truncate font-mono text-sm font-medium tabular-nums">
+                          {call.caller_number ?? "Unknown number"}
+                        </p>
+                        <p className="text-xs capitalize text-muted-foreground">
+                          {call.direction}
+                        </p>
                       </div>
                     </div>
-                    {i < recentCalls.length - 1 && <Separator />}
+                    <div className="flex shrink-0 items-center gap-4">
+                      <span className="font-mono text-sm tabular-nums text-muted-foreground">
+                        {call.duration_seconds != null
+                          ? formatDuration(call.duration_seconds)
+                          : "--"}
+                      </span>
+                      <StatusPill status={call.status} />
+                    </div>
                   </div>
                 ))}
               </div>
@@ -383,24 +372,30 @@ export default async function OverviewPage() {
               <CardTitle>Quick Actions</CardTitle>
             </CardHeader>
             <CardContent className="space-y-2">
-              <Link href="/dashboard/test-center" className="block">
-                <Button className="w-full justify-start gap-2" variant="outline">
-                  <PhoneOutgoing className="size-4" aria-hidden="true" />
-                  Test Call
-                </Button>
-              </Link>
-              <Link href="/dashboard/agent" className="block">
-                <Button className="w-full justify-start gap-2" variant="outline">
-                  <Settings className="size-4" aria-hidden="true" />
-                  Edit Agent
-                </Button>
-              </Link>
-              <Link href="/dashboard/analytics" className="block">
-                <Button className="w-full justify-start gap-2" variant="outline">
-                  <BarChart3 className="size-4" aria-hidden="true" />
-                  View Analytics
-                </Button>
-              </Link>
+              <Button
+                className="w-full justify-start gap-2"
+                variant="outline"
+                render={<Link href="/dashboard/test-center" />}
+              >
+                <PhoneOutgoing className="size-4" aria-hidden="true" />
+                Test Call
+              </Button>
+              <Button
+                className="w-full justify-start gap-2"
+                variant="outline"
+                render={<Link href="/dashboard/agent" />}
+              >
+                <Settings className="size-4" aria-hidden="true" />
+                Edit Agent
+              </Button>
+              <Button
+                className="w-full justify-start gap-2"
+                variant="outline"
+                render={<Link href="/dashboard/analytics" />}
+              >
+                <BarChart3 className="size-4" aria-hidden="true" />
+                View Analytics
+              </Button>
             </CardContent>
           </Card>
         </div>

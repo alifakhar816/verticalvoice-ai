@@ -6,20 +6,16 @@ import { createClient } from '@/lib/database/supabase-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { toast } from 'sonner';
+import { AuthSplitShell } from '@/components/auth/auth-split-shell';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [emailError, setEmailError] = useState('');
 
   const supabase = createClient();
 
@@ -47,80 +43,102 @@ export default function ForgotPasswordPage() {
 
   if (sent) {
     return (
-      <Card>
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <MailIcon className="h-6 w-6 text-primary" />
+      <AuthSplitShell>
+        <div className="text-center">
+          <div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-full bg-success/10 text-success">
+            <CheckIcon className="size-6" />
           </div>
-          <CardTitle className="text-xl">Check your email</CardTitle>
-          <CardDescription>
-            If an account exists for <strong>{email}</strong>, we sent a
+          <h1 className="text-2xl font-semibold tracking-tight">Check your email</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            If an account exists for{' '}
+            <strong className="text-foreground">{email}</strong>, we sent a
             password reset link. Please check your inbox.
-          </CardDescription>
-        </CardHeader>
-        <CardFooter className="justify-center">
+          </p>
           <Link href="/login">
-            <Button variant="ghost">Back to sign in</Button>
+            <Button variant="ghost" className="mt-6 h-11">
+              Back to sign in
+            </Button>
           </Link>
-        </CardFooter>
-      </Card>
+        </div>
+      </AuthSplitShell>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl">Reset your password</CardTitle>
-        <CardDescription>
-          Enter your email and we&apos;ll send you a reset link
-        </CardDescription>
-      </CardHeader>
-      <CardContent>
-        <form onSubmit={handleReset} className="space-y-4">
+    <AuthSplitShell>
+      <div>
+        <header className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight">
+            Reset your password
+          </h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Enter your email and we&apos;ll send you a reset link.
+          </p>
+        </header>
+
+        <form onSubmit={handleReset} className="space-y-5" noValidate>
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
               id="email"
               type="email"
+              inputMode="email"
               placeholder="you@example.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
+              onBlur={() =>
+                setEmailError(
+                  !email
+                    ? 'Email is required'
+                    : EMAIL_RE.test(email)
+                      ? ''
+                      : 'Enter a valid email address',
+                )
+              }
+              aria-invalid={!!emailError}
+              aria-describedby={emailError ? 'email-error' : undefined}
               required
               autoComplete="email"
             />
+            {emailError ? (
+              <p id="email-error" className="text-xs text-destructive">
+                {emailError}
+              </p>
+            ) : null}
           </div>
-          <Button type="submit" className="w-full" disabled={loading}>
+          <Button type="submit" className="h-11 w-full" disabled={loading}>
             {loading ? 'Sending...' : 'Send reset link'}
           </Button>
         </form>
-      </CardContent>
-      <CardFooter className="justify-center">
-        <Link href="/login">
-          <Button variant="ghost" className="text-sm">
+
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          Remembered it?{' '}
+          <Link
+            href="/login"
+            className="font-medium text-foreground transition-colors hover:text-brand"
+          >
             Back to sign in
-          </Button>
-        </Link>
-      </CardFooter>
-    </Card>
+          </Link>
+        </p>
+      </div>
+    </AuthSplitShell>
   );
 }
 
-function MailIcon({ className }: { className?: string }) {
+function CheckIcon({ className }: { className?: string }) {
   return (
     <svg
       className={className}
       xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"
       strokeLinejoin="round"
+      aria-hidden="true"
     >
-      <rect width="20" height="16" x="2" y="4" rx="2" />
-      <path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+      <path d="M20 6 9 17l-5-5" />
     </svg>
   );
 }

@@ -25,6 +25,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import { Separator } from "@/components/ui/separator";
+import { LiveCallOrb, type LiveCallOrbState } from "@/components/shared/live-call-orb";
 
 interface AnalyzeResult {
   matched: boolean;
@@ -137,8 +138,8 @@ const scoreBreakdown = [
 ];
 
 const resultIcon: Record<Scenario["result"], React.ReactNode> = {
-  pass: <CheckCircle2 className="size-4 text-green-500" />,
-  fail: <XCircle className="size-4 text-red-500" />,
+  pass: <CheckCircle2 className="size-4 text-success" />,
+  fail: <XCircle className="size-4 text-destructive" />,
   not_run: <Minus className="size-4 text-muted-foreground" />,
 };
 
@@ -152,8 +153,15 @@ const resultLabel: Record<Scenario["result"], string> = {
 
 type BrowserCallStatus = "idle" | "connecting" | "ringing" | "in-call" | "ended" | "error";
 
+function orbStateFor(status: BrowserCallStatus): LiveCallOrbState {
+  if (status === "in-call") return "live";
+  if (status === "connecting" || status === "ringing") return "ringing";
+  return "idle";
+}
+
 export default function TestCenterPage() {
   const [callerInput, setCallerInput] = useState("");
+  const [analyzedText, setAnalyzedText] = useState("");
   const [analyzing, setAnalyzing] = useState(false);
   const [result, setResult] = useState<AnalyzeResult | null>(null);
 
@@ -178,7 +186,7 @@ export default function TestCenterPage() {
       const anyErr = err as Record<string, unknown>;
       const parts = [anyErr.message, anyErr.code, anyErr.name]
         .filter((p) => typeof p === "string" && p.length > 0);
-      if (parts.length > 0) return parts.join(" — ");
+      if (parts.length > 0) return parts.join(", ");
       try {
         return JSON.stringify(err);
       } catch {
@@ -274,6 +282,7 @@ export default function TestCenterPage() {
         return;
       }
 
+      setAnalyzedText(text);
       setResult(data as AnalyzeResult);
     } catch {
       toast.error("Failed to analyze statement. Please try again.");
@@ -313,7 +322,7 @@ export default function TestCenterPage() {
                 }}
               />
               <Button
-                className="gap-2 shrink-0"
+                className="shrink-0 gap-2"
                 onClick={handleAnalyze}
                 disabled={analyzing || callerInput.trim().length === 0}
               >
@@ -330,7 +339,7 @@ export default function TestCenterPage() {
 
             {/* Analysis result */}
             {result ? (
-              <div className="space-y-3">
+              <div className="space-y-4">
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Detected Intent</span>
                   <Badge variant={result.matched ? "default" : "outline"}>
@@ -340,23 +349,34 @@ export default function TestCenterPage() {
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium">Confidence</span>
                   <span
-                    className={`text-sm font-semibold ${
+                    className={`font-mono text-sm font-semibold tabular-nums ${
                       result.confidence >= 60
-                        ? "text-green-600"
+                        ? "text-success"
                         : result.confidence >= 30
-                          ? "text-amber-600"
-                          : "text-red-600"
+                          ? "text-warning"
+                          : "text-destructive"
                     }`}
                   >
                     {result.confidence}%
                   </span>
                 </div>
-                <div className="space-y-1.5">
-                  <span className="text-sm font-medium">Suggested Response</span>
-                  <div className="rounded-md border p-3 text-sm text-muted-foreground bg-muted/50">
-                    &quot;{result.suggestedResponse}&quot;
+
+                {/* Transcript bubbles (LiveCallOrb style) */}
+                <div className="space-y-2">
+                  {analyzedText ? (
+                    <div className="flex justify-start">
+                      <span className="inline-block rounded-lg bg-secondary px-3 py-2 text-sm leading-relaxed text-secondary-foreground">
+                        {analyzedText}
+                      </span>
+                    </div>
+                  ) : null}
+                  <div className="flex justify-end">
+                    <span className="inline-block rounded-lg border border-brand/20 bg-accent px-3 py-2 text-sm leading-relaxed text-accent-foreground">
+                      {result.suggestedResponse}
+                    </span>
                   </div>
                 </div>
+
                 {result.note && (
                   <p className="text-xs text-muted-foreground">{result.note}</p>
                 )}
@@ -375,11 +395,19 @@ export default function TestCenterPage() {
           <CardHeader>
             <CardTitle>Live Test Call</CardTitle>
             <CardDescription>
-              Call your agent directly from this browser — a real call through your
+              Call your agent directly from this browser, a real call through your
               actual phone number and voice agent, no phone required.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
+            <div className="flex justify-center rounded-lg border bg-muted/30 py-6">
+              <LiveCallOrb
+                size="md"
+                state={orbStateFor(callStatus)}
+                showTimer={false}
+              />
+            </div>
+
             {callStatus === "idle" || callStatus === "ended" || callStatus === "error" ? (
               <Button className="w-full gap-2" onClick={handleStartBrowserCall}>
                 <Phone className="size-4" />
@@ -398,7 +426,7 @@ export default function TestCenterPage() {
 
             <Separator />
 
-            <div className="rounded-md border p-3 space-y-1">
+            <div className="space-y-1 rounded-md border p-3">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Status</span>
                 <span className="font-medium capitalize">
@@ -408,7 +436,9 @@ export default function TestCenterPage() {
               {callStatus === "in-call" && (
                 <div className="flex items-center justify-between text-sm">
                   <span className="text-muted-foreground">Duration</span>
-                  <span>{formatDuration(callDuration)}</span>
+                  <span className="font-mono tabular-nums">
+                    {formatDuration(callDuration)}
+                  </span>
                 </div>
               )}
               {callStatus === "error" && callError && (
@@ -418,7 +448,7 @@ export default function TestCenterPage() {
 
             <p className="text-xs text-muted-foreground">
               Your browser will ask for microphone access. This routes through your
-              real Twilio number and the same code path a real caller hits — just
+              real Twilio number and the same code path a real caller hits, just
               without dialing a phone.
             </p>
           </CardContent>
@@ -444,11 +474,11 @@ export default function TestCenterPage() {
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b text-left">
+                <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
                   <th className="pb-2 font-medium">Scenario</th>
                   <th className="pb-2 font-medium">Category</th>
                   <th className="pb-2 font-medium">Last Run</th>
-                  <th className="pb-2 font-medium text-right">Result</th>
+                  <th className="pb-2 text-right font-medium">Result</th>
                 </tr>
               </thead>
               <tbody>
@@ -458,7 +488,7 @@ export default function TestCenterPage() {
                     <td className="py-2.5">
                       <Badge variant="outline">{s.category}</Badge>
                     </td>
-                    <td className="py-2.5 text-muted-foreground">
+                    <td className="py-2.5 font-mono text-muted-foreground">
                       {s.lastRun}
                     </td>
                     <td className="py-2.5">
@@ -467,9 +497,9 @@ export default function TestCenterPage() {
                         <span
                           className={
                             s.result === "pass"
-                              ? "text-green-600"
+                              ? "text-success"
                               : s.result === "fail"
-                                ? "text-red-600"
+                                ? "text-destructive"
                                 : "text-muted-foreground"
                           }
                         >
@@ -483,12 +513,12 @@ export default function TestCenterPage() {
             </table>
           </div>
 
-          <div className="flex gap-2 justify-end">
+          <div className="flex justify-end gap-2">
             <Button variant="outline" className="gap-2">
               <Play className="size-4" />
               Run Selected
             </Button>
-            <Button className="gap-2">
+            <Button variant="brand" className="gap-2">
               <Play className="size-4" />
               Run All
             </Button>
@@ -512,15 +542,15 @@ export default function TestCenterPage() {
                 >
                   <div>
                     <p className="text-sm font-medium">{t.scenario}</p>
-                    <p className="text-xs text-muted-foreground">
+                    <p className="font-mono text-xs text-muted-foreground">
                       {t.timestamp}
                     </p>
                   </div>
                   <div className="flex items-center gap-3">
-                    <span className="text-sm font-semibold">{t.score}/100</span>
-                    <Badge
-                      variant={t.passed ? "default" : "destructive"}
-                    >
+                    <span className="font-mono text-sm font-semibold tabular-nums">
+                      {t.score}/100
+                    </span>
+                    <Badge variant={t.passed ? "success" : "destructive"}>
                       {t.passed ? "Pass" : "Fail"}
                     </Badge>
                   </div>
@@ -536,7 +566,7 @@ export default function TestCenterPage() {
             <CardTitle>Score Breakdown</CardTitle>
             <CardDescription>
               Latest test score:{" "}
-              <span className="font-semibold text-foreground">91/100</span>
+              <span className="font-mono font-semibold text-foreground">91/100</span>
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -544,7 +574,9 @@ export default function TestCenterPage() {
               <div key={item.label} className="space-y-1.5">
                 <div className="flex items-center justify-between text-sm">
                   <span>{item.label}</span>
-                  <span className="font-medium">{item.score}%</span>
+                  <span className="font-mono font-medium tabular-nums">
+                    {item.score}%
+                  </span>
                 </div>
                 <Progress value={item.score} className="h-2" />
               </div>

@@ -23,6 +23,7 @@ import {
 import { createServerClient } from "@/lib/database/supabase-server";
 import { getCurrentTenantId } from "@/domain/tenants/current";
 import { getCall } from "@/domain/calls/service";
+import { RecordingPlayer } from "./recording-player";
 
 function NoTenantState() {
   return (
@@ -59,38 +60,28 @@ function statusLabel(status: string): string {
   }
 }
 
-function statusBadge(status: string) {
-  switch (status) {
-    case "completed":
-      return (
-        <Badge variant="outline" className="border-green-500/50 text-green-600 dark:text-green-400">
-          {statusLabel(status)}
-        </Badge>
-      );
-    case "in_progress":
-    case "ringing":
-    case "initiated":
-      return (
-        <Badge variant="outline" className="border-blue-500/50 text-blue-600 dark:text-blue-400">
-          {statusLabel(status)}
-        </Badge>
-      );
-    case "busy":
-    case "no_answer":
-      return (
-        <Badge variant="outline" className="border-yellow-500/50 text-yellow-600 dark:text-yellow-400">
-          {statusLabel(status)}
-        </Badge>
-      );
-    case "failed":
-      return (
-        <Badge variant="outline" className="border-red-500/50 text-red-600 dark:text-red-400">
-          {statusLabel(status)}
-        </Badge>
-      );
-    default:
-      return <Badge variant="secondary">{statusLabel(status)}</Badge>;
-  }
+/** Status pill: semantic tint + solid text + a dot, never color alone. */
+function StatusPill({ status }: { status: string }) {
+  const variant: "success" | "warning" | "destructive" | "outline" =
+    status === "completed"
+      ? "success"
+      : status === "failed" || status === "no_answer"
+        ? "destructive"
+        : status === "busy" ||
+            status === "in_progress" ||
+            status === "ringing" ||
+            status === "initiated"
+          ? "warning"
+          : "outline";
+
+  const dotClass = variant === "outline" ? "bg-muted-foreground" : "bg-current";
+
+  return (
+    <Badge variant={variant} className="gap-1.5">
+      <span className={`inline-block size-1.5 rounded-full ${dotClass}`} aria-hidden="true" />
+      {statusLabel(status)}
+    </Badge>
+  );
 }
 
 function formatDuration(seconds: number | null): string {
@@ -106,12 +97,6 @@ function formatCurrency(amount: number, currency: string): string {
   } catch {
     return `$${amount.toFixed(2)}`;
   }
-}
-
-function scoreBarColor(score: number) {
-  if (score >= 90) return "bg-green-500";
-  if (score >= 75) return "bg-yellow-500";
-  return "bg-red-500";
 }
 
 function formatDimensionLabel(dimension: string): string {
@@ -133,6 +118,54 @@ function asDimensionScores(criteria: unknown): DimensionScore[] {
     const record = item as Record<string, unknown>;
     return typeof record.dimension === "string" && typeof record.score === "number";
   });
+}
+
+interface TranscriptLine {
+  speaker: "caller" | "agent";
+  text: string;
+}
+
+/**
+ * Presentational parse of the stored transcript string into caller/agent
+ * turns for the bubble view. Detects leading speaker labels
+ * (e.g. "Agent:", "Caller -"); unlabeled lines continue the current
+ * speaker. Returns null when no labels are present so the caller can
+ * fall back to the raw pre-formatted text (no data is invented).
+ */
+function parseTranscript(content: string): TranscriptLine[] | null {
+  const lines = content
+    .split(/\r?\n/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const agentRe = /^(agent|assistant|ai|bot|rep|representative|voice ?agent)\s*[:\-]\s*(.*)$/i;
+  const callerRe = /^(caller|customer|user|human|client|guest)\s*[:\-]\s*(.*)$/i;
+
+  const out: TranscriptLine[] = [];
+  let sawLabel = false;
+  let current: TranscriptLine | null = null;
+
+  for (const line of lines) {
+    const agentMatch = line.match(agentRe);
+    const callerMatch = line.match(callerRe);
+    if (agentMatch) {
+      sawLabel = true;
+      current = { speaker: "agent", text: agentMatch[2] };
+      out.push(current);
+    } else if (callerMatch) {
+      sawLabel = true;
+      current = { speaker: "caller", text: callerMatch[2] };
+      out.push(current);
+    } else if (current) {
+      current.text = current.text ? `${current.text} ${line}` : line;
+    } else {
+      current = { speaker: "caller", text: line };
+      out.push(current);
+    }
+  }
+
+  if (!sawLabel) return null;
+  return out.filter((l) => l.text.trim().length > 0);
 }
 
 export default async function CallDetailPage({
@@ -230,14 +263,17 @@ export default async function CallDetailPage({
   });
 
   const dimensionScores = asDimensionScores(evaluation?.criteria);
+  const transcriptLines = call.transcript?.content
+    ? parseTranscript(call.transcript.content)
+    : null;
 
   return (
     <div className="space-y-6">
       {/* Back button */}
       <div>
         <Button variant="ghost" size="sm" render={<Link href="/dashboard/calls" className="gap-2" />}>
-            <ArrowLeft className="size-4" />
-            Back to Calls
+          <ArrowLeft className="size-4" />
+          Back to Calls
         </Button>
       </div>
 
@@ -245,70 +281,20 @@ export default async function CallDetailPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{callerLabel}</h1>
-          <p className="text-muted-foreground">Call {call.id}</p>
+          <p className="font-mono text-sm text-muted-foreground">Call {call.id}</p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           {call.outcome?.outcome_type && (
-            <Badge variant="default" className="capitalize">
+            <Badge variant="outline" className="capitalize">
               {call.outcome.outcome_type.replace(/_/g, " ")}
             </Badge>
           )}
-          <Badge variant="outline" className="capitalize">{call.direction}</Badge>
-          {statusBadge(call.status)}
+          <Badge variant="outline" className="capitalize">
+            {call.direction}
+          </Badge>
+          <StatusPill status={call.status} />
         </div>
       </div>
-
-      {/* Call Metadata */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Call Details</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
-            <div className="flex items-center gap-2">
-              <Clock className="size-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Date / Time</p>
-                <p className="text-sm font-medium">{dateTime}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <Clock className="size-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Duration</p>
-                <p className="text-sm font-medium">{formatDuration(call.duration_seconds)}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              {call.direction === "inbound" ? (
-                <PhoneIncoming className="size-4 text-muted-foreground" />
-              ) : (
-                <PhoneOutgoing className="size-4 text-muted-foreground" />
-              )}
-              <div>
-                <p className="text-xs text-muted-foreground">Direction</p>
-                <p className="text-sm font-medium capitalize">{call.direction}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <PhoneIncoming className="size-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Phone</p>
-                <p className="text-sm font-medium">{call.caller_number ?? "Unknown"}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2">
-              <DollarSign className="size-4 text-muted-foreground" />
-              <div>
-                <p className="text-xs text-muted-foreground">Cost</p>
-                <p className="text-sm font-medium">
-                  {costRow ? formatCurrency(costRow.total_cost, costRow.currency) : "N/A"}
-                </p>
-              </div>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
 
       {/* Summary */}
       <Card>
@@ -322,59 +308,224 @@ export default async function CallDetailPage({
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        {/* Timeline */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Timeline</CardTitle>
-            <CardDescription>Event sequence during the call</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {!events || events.length === 0 ? (
-              <p className="py-6 text-center text-sm text-muted-foreground">
-                No events recorded for this call.
-              </p>
-            ) : (
-              <div className="relative ml-3 space-y-0">
-                {events.map((entry, i) => {
-                  const elapsedMs = Math.max(
-                    0,
-                    new Date(entry.timestamp).getTime() - new Date(call.started_at).getTime()
-                  );
-                  const elapsedSeconds = Math.round(elapsedMs / 1000);
-                  const mm = Math.floor(elapsedSeconds / 60);
-                  const ss = (elapsedSeconds % 60).toString().padStart(2, "0");
-                  return (
-                    <div key={i} className="relative flex gap-4 pb-6 last:pb-0">
-                      {/* Vertical line */}
-                      {i < events.length - 1 && (
-                        <div className="absolute left-[5px] top-3 h-full w-px bg-border" />
-                      )}
-                      {/* Dot */}
-                      <div className="relative z-10 mt-1.5 size-[11px] shrink-0 rounded-full border-2 border-primary bg-background" />
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-2">
-                          <span className="text-xs font-mono text-muted-foreground">{`${mm}:${ss}`}</span>
-                          <span className="text-sm font-medium capitalize">
-                            {entry.event_type.replace(/_/g, " ")}
-                          </span>
-                        </div>
-                        {entry.data != null && (
-                          <p className="truncate text-xs text-muted-foreground">
-                            {JSON.stringify(entry.data)}
-                          </p>
-                        )}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* LEFT: transcript, timeline, tools, recording */}
+        <div className="space-y-6 lg:col-span-2">
+          {/* Transcript (bubble style) */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Transcript</CardTitle>
+              <CardDescription>Caller and agent turns during the call</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {transcriptLines && transcriptLines.length > 0 ? (
+                <div className="flex flex-col gap-3" aria-label="Call transcript">
+                  {transcriptLines.map((line, i) => {
+                    const isAgent = line.speaker === "agent";
+                    return (
+                      <div
+                        key={i}
+                        className={`flex flex-col gap-1 ${isAgent ? "items-end" : "items-start"}`}
+                      >
+                        <span className="px-1 font-mono text-[10px] uppercase tracking-wider text-muted-foreground">
+                          {isAgent ? "Agent" : "Caller"}
+                        </span>
+                        <span
+                          className={`inline-block max-w-[85%] rounded-lg px-3.5 py-2.5 text-sm leading-relaxed ${
+                            isAgent
+                              ? "border border-brand/20 bg-accent text-accent-foreground"
+                              : "bg-secondary text-secondary-foreground"
+                          }`}
+                        >
+                          {line.text}
+                        </span>
                       </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    );
+                  })}
+                </div>
+              ) : call.transcript?.content ? (
+                <p className="whitespace-pre-wrap text-sm leading-relaxed">
+                  {call.transcript.content}
+                </p>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  No transcript available for this call.
+                </p>
+              )}
+            </CardContent>
+          </Card>
 
-        {/* Evaluation Score + Policy */}
+          {/* Timeline */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Timeline</CardTitle>
+              <CardDescription>Event sequence during the call</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!events || events.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No events recorded for this call.
+                </p>
+              ) : (
+                <div className="relative ml-3 space-y-0">
+                  {events.map((entry, i) => {
+                    const elapsedMs = Math.max(
+                      0,
+                      new Date(entry.timestamp).getTime() - new Date(call.started_at).getTime()
+                    );
+                    const elapsedSeconds = Math.round(elapsedMs / 1000);
+                    const mm = Math.floor(elapsedSeconds / 60);
+                    const ss = (elapsedSeconds % 60).toString().padStart(2, "0");
+                    return (
+                      <div key={i} className="relative flex gap-4 pb-6 last:pb-0">
+                        {/* Vertical line */}
+                        {i < events.length - 1 && (
+                          <div className="absolute left-[5px] top-3 h-full w-px bg-border" />
+                        )}
+                        {/* Dot */}
+                        <div className="relative z-10 mt-1.5 size-[11px] shrink-0 rounded-full border-2 border-brand bg-background" />
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-xs tabular-nums text-muted-foreground">{`${mm}:${ss}`}</span>
+                            <span className="text-sm font-medium capitalize">
+                              {entry.event_type.replace(/_/g, " ")}
+                            </span>
+                          </div>
+                          {entry.data != null && (
+                            <p className="truncate font-mono text-xs text-muted-foreground">
+                              {JSON.stringify(entry.data)}
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Tool Runs */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Tool Executions</CardTitle>
+              <CardDescription>Functions called by the agent during this call</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!toolRuns || toolRuns.length === 0 ? (
+                <p className="py-6 text-center text-sm text-muted-foreground">
+                  No tool executions recorded for this call.
+                </p>
+              ) : (
+                <div className="space-y-4">
+                  {toolRuns.map((tool, i) => (
+                    <div key={i}>
+                      <div className="flex items-start gap-3">
+                        <Wrench className="mt-0.5 size-4 text-muted-foreground" />
+                        <div className="min-w-0 flex-1">
+                          <p className="font-mono text-sm font-medium">{tool.tool_name}</p>
+                          {tool.input != null && (
+                            <p className="truncate font-mono text-xs text-muted-foreground">
+                              Input: {JSON.stringify(tool.input)}
+                            </p>
+                          )}
+                          {tool.status === "failed" && tool.error_message ? (
+                            <p className="truncate font-mono text-xs text-destructive">
+                              Error: {tool.error_message}
+                            </p>
+                          ) : tool.output != null ? (
+                            <p className="truncate font-mono text-xs text-muted-foreground">
+                              Result: {JSON.stringify(tool.output)}
+                            </p>
+                          ) : null}
+                        </div>
+                      </div>
+                      {i < toolRuns.length - 1 && <Separator className="mt-4" />}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Recording */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Recording</CardTitle>
+            </CardHeader>
+            <CardContent>
+              {call.recording_url ? (
+                <RecordingPlayer src={call.recording_url} />
+              ) : (
+                <p className="text-sm text-muted-foreground">No recording available for this call.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* RIGHT: metadata, evaluation, outcome/tags, policy */}
         <div className="space-y-6">
+          {/* Metadata */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Call Details</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <dl className="space-y-3 text-sm">
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="size-4" />
+                    Date / Time
+                  </dt>
+                  <dd className="text-right font-medium">{dateTime}</dd>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    <Clock className="size-4" />
+                    Duration
+                  </dt>
+                  <dd className="font-mono font-medium tabular-nums">
+                    {formatDuration(call.duration_seconds)}
+                  </dd>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    {call.direction === "inbound" ? (
+                      <PhoneIncoming className="size-4" />
+                    ) : (
+                      <PhoneOutgoing className="size-4" />
+                    )}
+                    Direction
+                  </dt>
+                  <dd className="font-medium capitalize">{call.direction}</dd>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    <PhoneIncoming className="size-4" />
+                    Phone
+                  </dt>
+                  <dd className="font-mono font-medium tabular-nums">
+                    {call.caller_number ?? "Unknown"}
+                  </dd>
+                </div>
+                <Separator />
+                <div className="flex items-center justify-between gap-4">
+                  <dt className="flex items-center gap-2 text-muted-foreground">
+                    <DollarSign className="size-4" />
+                    Cost
+                  </dt>
+                  <dd className="font-mono font-medium tabular-nums">
+                    {costRow ? formatCurrency(costRow.total_cost, costRow.currency) : "N/A"}
+                  </dd>
+                </div>
+              </dl>
+            </CardContent>
+          </Card>
+
+          {/* Evaluation Score */}
           <Card>
             <CardHeader>
               <CardTitle>Evaluation Score</CardTitle>
@@ -387,9 +538,13 @@ export default async function CallDetailPage({
                 </p>
               ) : (
                 <>
-                  <div className="mb-4 text-center">
-                    <span className="text-4xl font-bold">{Math.round(evaluation.score)}</span>
-                    <span className="text-lg text-muted-foreground">/{evaluation.max_score}</span>
+                  <div className="mb-5 flex items-baseline justify-center gap-1">
+                    <span className="font-mono text-5xl font-bold tabular-nums leading-none text-brand">
+                      {Math.round(evaluation.score)}
+                    </span>
+                    <span className="font-mono text-lg tabular-nums text-muted-foreground">
+                      /{evaluation.max_score}
+                    </span>
                   </div>
                   {dimensionScores.length > 0 && (
                     <div className="space-y-3">
@@ -397,11 +552,13 @@ export default async function CallDetailPage({
                         <div key={item.dimension}>
                           <div className="mb-1 flex justify-between text-sm">
                             <span>{formatDimensionLabel(item.dimension)}</span>
-                            <span className="font-medium">{Math.round(item.score)}</span>
+                            <span className="font-mono font-medium tabular-nums">
+                              {Math.round(item.score)}
+                            </span>
                           </div>
-                          <div className="h-2 w-full rounded-full bg-muted">
+                          <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted">
                             <div
-                              className={`h-2 rounded-full ${scoreBarColor(item.score)}`}
+                              className="h-full rounded-full bg-brand"
                               style={{ width: `${Math.min(100, Math.max(0, item.score))}%` }}
                             />
                           </div>
@@ -410,14 +567,48 @@ export default async function CallDetailPage({
                     </div>
                   )}
                   {evaluation.feedback && (
-                    <p className="mt-4 text-xs text-muted-foreground">{evaluation.feedback}</p>
+                    <p className="mt-4 text-xs leading-relaxed text-muted-foreground">
+                      {evaluation.feedback}
+                    </p>
                   )}
                 </>
               )}
             </CardContent>
           </Card>
 
-          {/* Policy Events */}
+          {/* Outcome & Tags */}
+          <Card>
+            <CardHeader>
+              <CardTitle>Outcome</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="flex flex-wrap gap-2">
+                {call.outcome?.outcome_type ? (
+                  <Badge variant="success" className="gap-1.5 capitalize">
+                    <span className="inline-block size-1.5 rounded-full bg-current" aria-hidden="true" />
+                    {call.outcome.outcome_type.replace(/_/g, " ")}
+                  </Badge>
+                ) : (
+                  <span className="text-sm text-muted-foreground">No outcome recorded.</span>
+                )}
+                {call.outcome?.disposition && (
+                  <Badge variant="outline" className="capitalize">
+                    {call.outcome.disposition.replace(/_/g, " ")}
+                  </Badge>
+                )}
+                <Badge variant="outline" className="capitalize">
+                  {call.direction}
+                </Badge>
+              </div>
+              {call.outcome?.notes && (
+                <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                  {call.outcome.notes}
+                </p>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Policy Checks */}
           <Card>
             <CardHeader>
               <CardTitle>Policy Checks</CardTitle>
@@ -428,100 +619,25 @@ export default async function CallDetailPage({
                   No policy checks recorded for this call.
                 </p>
               ) : (
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm">Recording Consent ({recordingConsent.method})</span>
-                    {recordingConsent.consented ? (
-                      <div className="flex items-center gap-1.5 text-green-600 dark:text-green-400">
-                        <CheckCircle className="size-4" />
-                        <span className="text-sm font-medium">Granted</span>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-1.5 text-red-600 dark:text-red-400">
-                        <XCircle className="size-4" />
-                        <span className="text-sm font-medium">Declined</span>
-                      </div>
-                    )}
-                  </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm">Recording Consent ({recordingConsent.method})</span>
+                  {recordingConsent.consented ? (
+                    <div className="flex items-center gap-1.5 text-success">
+                      <CheckCircle className="size-4" />
+                      <span className="text-sm font-medium">Granted</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1.5 text-destructive">
+                      <XCircle className="size-4" />
+                      <span className="text-sm font-medium">Declined</span>
+                    </div>
+                  )}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
       </div>
-
-      {/* Transcript */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Transcript</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {call.transcript?.content ? (
-            <p className="whitespace-pre-wrap text-sm leading-relaxed">{call.transcript.content}</p>
-          ) : (
-            <p className="text-sm text-muted-foreground">No transcript available for this call.</p>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Tool Runs */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tool Executions</CardTitle>
-          <CardDescription>Functions called by the agent during this call</CardDescription>
-        </CardHeader>
-        <CardContent>
-          {!toolRuns || toolRuns.length === 0 ? (
-            <p className="py-6 text-center text-sm text-muted-foreground">
-              No tool executions recorded for this call.
-            </p>
-          ) : (
-            <div className="space-y-4">
-              {toolRuns.map((tool, i) => (
-                <div key={i}>
-                  <div className="flex items-start gap-3">
-                    <Wrench className="mt-0.5 size-4 text-muted-foreground" />
-                    <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium font-mono">{tool.tool_name}</p>
-                      {tool.input != null && (
-                        <p className="truncate text-xs text-muted-foreground">
-                          Input: {JSON.stringify(tool.input)}
-                        </p>
-                      )}
-                      {tool.status === "failed" && tool.error_message ? (
-                        <p className="truncate text-xs text-red-600 dark:text-red-400">
-                          Error: {tool.error_message}
-                        </p>
-                      ) : tool.output != null ? (
-                        <p className="truncate text-xs text-muted-foreground">
-                          Result: {JSON.stringify(tool.output)}
-                        </p>
-                      ) : null}
-                    </div>
-                  </div>
-                  {i < toolRuns.length - 1 && <Separator className="mt-4" />}
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Audio Player */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Recording</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {call.recording_url ? (
-            <audio controls className="w-full" src={call.recording_url}>
-              Your browser does not support the audio element.
-            </audio>
-          ) : (
-            <p className="text-sm text-muted-foreground">No recording available for this call.</p>
-          )}
-        </CardContent>
-      </Card>
     </div>
   );
 }

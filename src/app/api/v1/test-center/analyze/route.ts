@@ -93,7 +93,7 @@ function buildSuggestedResponse(
   businessName: string,
 ): string {
   if (!intent || !intent.name) {
-    return "I want to make sure I understand — could you tell me a bit more about what you're calling about today?";
+    return "I want to make sure I understand. Could you tell me a bit more about what you're calling about today?";
   }
 
   const requiredSlots = (intent.slots ?? []).filter(

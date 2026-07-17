@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import Link from 'next/link';
+import { Check, X, ChevronDown } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Card,
@@ -27,7 +28,7 @@ const tiers = [
       'Call transcripts',
       'Business hours routing',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Start free trial',
     highlighted: false,
   },
   {
@@ -40,13 +41,13 @@ const tiers = [
       '3 AI agents',
       '500 calls per month',
       'Priority support',
-      'Advanced analytics & reports',
-      'Custom greetings & scripts',
+      'Advanced analytics and reports',
+      'Custom greetings and scripts',
       'Call recordings',
       'CRM integrations',
       'A/B response testing',
     ],
-    cta: 'Start Free Trial',
+    cta: 'Start free trial',
     highlighted: true,
   },
   {
@@ -62,11 +63,11 @@ const tiers = [
       'Custom SLA',
       'Custom integrations',
       'HIPAA BAA available',
-      'SSO / SAML',
+      'SSO and SAML',
       'Priority onboarding',
       'Custom AI training',
     ],
-    cta: 'Contact Sales',
+    cta: 'Contact sales',
     highlighted: false,
   },
 ];
@@ -85,7 +86,7 @@ const comparisonFeatures = [
   { name: 'Dedicated account manager', starter: false, growth: false, enterprise: true },
   { name: 'Custom SLA', starter: false, growth: false, enterprise: true },
   { name: 'HIPAA BAA', starter: false, growth: false, enterprise: true },
-  { name: 'SSO / SAML', starter: false, growth: false, enterprise: true },
+  { name: 'SSO and SAML', starter: false, growth: false, enterprise: true },
   { name: 'Custom AI training', starter: false, growth: false, enterprise: true },
 ];
 
@@ -93,17 +94,17 @@ const billingFaqs = [
   {
     question: 'Is there a free trial?',
     answer:
-      'Yes! Every plan starts with a 14-day free trial. No credit card required to get started. You can upgrade, downgrade, or cancel at any time during or after the trial.',
+      'Yes. Every plan starts with a 14-day free trial. No credit card required to get started. You can upgrade, downgrade, or cancel at any time during or after the trial.',
   },
   {
-    question: 'What counts as a "call"?',
+    question: 'What counts as a call?',
     answer:
       'A call is any inbound or outbound phone conversation handled by your AI agent. Test calls made during setup do not count toward your monthly limit.',
   },
   {
     question: 'What happens if I exceed my monthly call limit?',
     answer:
-      'You will receive a notification when you reach 80% of your limit. Additional calls beyond your plan are billed at $0.75 per call. You can upgrade your plan at any time to avoid overage charges.',
+      'You get a notification when you reach 80% of your limit. Additional calls beyond your plan are billed at $0.75 per call. You can upgrade at any time to avoid overage charges.',
   },
   {
     question: 'Can I change plans mid-cycle?',
@@ -128,7 +129,7 @@ const billingFaqs = [
   {
     question: 'Can I get a refund?',
     answer:
-      'If you are not satisfied within the first 30 days of a paid plan, we offer a full refund -- no questions asked. Contact support@verticalvoice.ai to request one.',
+      'If you are not satisfied within the first 30 days of a paid plan, we offer a full refund, no questions asked. Contact support@verticalvoice.ai to request one.',
   },
 ];
 
@@ -149,34 +150,18 @@ export default function PricingPage() {
   };
 
   const estimates = [
-    {
-      tier: 'Starter',
-      base: 49,
-      included: 100,
-      overage: 0.75,
-    },
-    {
-      tier: 'Growth',
-      base: 149,
-      included: 500,
-      overage: 0.75,
-    },
-    {
-      tier: 'Enterprise',
-      base: null,
-      included: Infinity,
-      overage: 0,
-    },
+    { tier: 'Starter', base: 49, included: 100, overage: 0.75 },
+    { tier: 'Growth', base: 149, included: 500, overage: 0.75 },
+    { tier: 'Enterprise', base: null, included: Infinity, overage: 0 },
   ];
 
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
-        <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
+      <section className="relative overflow-hidden border-b">
+        <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+            <h1 className="font-display text-4xl tracking-tight sm:text-5xl lg:text-6xl">
               Simple, transparent pricing
             </h1>
             <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl">
@@ -187,50 +172,48 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Pricing Cards */}
-      <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
+      {/* Pricing cards */}
+      <section className="mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
         <div className="grid gap-8 lg:grid-cols-3">
           {tiers.map((tier) => (
             <Card
               key={tier.name}
               className={`relative flex flex-col ${
-                tier.highlighted
-                  ? 'overflow-visible border-primary shadow-lg ring-1 ring-primary'
-                  : ''
+                tier.highlighted ? 'overflow-visible ring-2 ring-brand' : ''
               }`}
             >
               {tier.highlighted && (
                 <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge className="px-3 py-1">Most Popular</Badge>
+                  <Badge className="border-transparent bg-brand px-3 py-1 text-brand-foreground">
+                    Most popular
+                  </Badge>
                 </div>
               )}
               <CardHeader className="text-center">
                 <CardTitle className="text-xl">{tier.name}</CardTitle>
                 <CardDescription>{tier.description}</CardDescription>
                 <div className="pt-4">
-                  <span className="text-4xl font-bold">{tier.price}</span>
+                  <span className="font-display text-4xl">{tier.price}</span>
                   <span className="text-muted-foreground">{tier.period}</span>
                 </div>
-                <p className="pt-1 text-sm text-muted-foreground">
+                <p className="pt-1 font-mono text-sm text-muted-foreground">
                   {tier.calls}
                 </p>
               </CardHeader>
               <CardContent className="flex flex-1 flex-col">
                 <ul className="flex-1 space-y-3">
                   {tier.features.map((feature) => (
-                    <li
-                      key={feature}
-                      className="flex items-start gap-2 text-sm"
-                    >
-                      <CheckIcon className="mt-0.5 h-4 w-4 shrink-0 text-green-500" />
+                    <li key={feature} className="flex items-start gap-2 text-sm">
+                      <Check
+                        className="mt-0.5 size-4 shrink-0 text-brand"
+                        aria-hidden
+                      />
                       {feature}
                     </li>
                   ))}
                 </ul>
                 <div className="pt-8">
-                  <Link
-                    href={tier.name === 'Enterprise' ? '/contact' : '/signup'}
-                  >
+                  <Link href={tier.name === 'Enterprise' ? '/contact' : '/signup'}>
                     <Button
                       className="w-full"
                       variant={tier.highlighted ? 'default' : 'outline'}
@@ -246,11 +229,11 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Feature Comparison */}
-      <section className="border-y bg-muted/30">
+      {/* Feature comparison */}
+      <section className="border-y bg-secondary/30">
         <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
               Feature comparison
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
@@ -258,19 +241,19 @@ export default function PricingPage() {
             </p>
           </div>
           <div className="mx-auto mt-12 max-w-4xl overflow-x-auto">
-            <table className="w-full text-sm">
+            <table className="w-full border-collapse text-sm">
               <thead>
-                <tr className="border-b">
-                  <th className="pb-4 pr-4 text-left font-semibold">
+                <tr className="bg-brand text-brand-foreground">
+                  <th className="rounded-l-lg px-5 py-3.5 text-left font-semibold">
                     Feature
                   </th>
-                  <th className="pb-4 px-4 text-center font-semibold">
+                  <th className="px-4 py-3.5 text-center font-semibold">
                     Starter
                   </th>
-                  <th className="pb-4 px-4 text-center font-semibold">
+                  <th className="px-4 py-3.5 text-center font-semibold">
                     Growth
                   </th>
-                  <th className="pb-4 pl-4 text-center font-semibold">
+                  <th className="rounded-r-lg px-4 py-3.5 text-center font-semibold">
                     Enterprise
                   </th>
                 </tr>
@@ -278,16 +261,16 @@ export default function PricingPage() {
               <tbody>
                 {comparisonFeatures.map((row) => (
                   <tr key={row.name} className="border-b last:border-0">
-                    <td className="py-3 pr-4 text-muted-foreground">
+                    <td className="px-5 py-3 text-muted-foreground">
                       {row.name}
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="px-4 py-3 text-center">
                       <FeatureCell value={row.starter} />
                     </td>
-                    <td className="py-3 px-4 text-center">
+                    <td className="px-4 py-3 text-center">
                       <FeatureCell value={row.growth} />
                     </td>
-                    <td className="py-3 pl-4 text-center">
+                    <td className="px-4 py-3 text-center">
                       <FeatureCell value={row.enterprise} />
                     </td>
                   </tr>
@@ -298,10 +281,10 @@ export default function PricingPage() {
         </div>
       </section>
 
-      {/* Cost Calculator */}
+      {/* Cost calculator */}
       <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
         <div className="mx-auto max-w-2xl text-center">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
             Estimate your monthly cost
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
@@ -314,7 +297,7 @@ export default function PricingPage() {
               htmlFor="call-volume"
               className="text-sm font-medium whitespace-nowrap"
             >
-              Expected monthly calls:
+              Expected monthly calls
             </label>
             <input
               id="call-volume"
@@ -323,7 +306,7 @@ export default function PricingPage() {
               max="100000"
               value={callVolume}
               onChange={(e) => setCallVolume(e.target.value)}
-              className="w-32 rounded-lg border bg-background px-4 py-2 text-center text-lg font-semibold focus:outline-none focus:ring-2 focus:ring-primary"
+              className="h-11 w-36 rounded-lg border bg-card px-4 text-center font-mono text-lg font-semibold tabular-nums focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </div>
           <div className="mt-8 grid gap-6 sm:grid-cols-3">
@@ -339,22 +322,22 @@ export default function PricingPage() {
                   <CardContent>
                     {cost !== null ? (
                       <>
-                        <p className="text-3xl font-bold">
+                        <p className="font-display text-4xl tabular-nums text-brand">
                           ${cost.toFixed(2)}
                         </p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           per month
                         </p>
                         {calls > est.included && (
-                          <p className="mt-2 text-xs text-amber-600">
+                          <p className="mt-2 text-xs text-warning">
                             Includes {calls - est.included} overage calls at
-                            $0.75/call
+                            $0.75 each
                           </p>
                         )}
                       </>
                     ) : (
                       <>
-                        <p className="text-3xl font-bold">Custom</p>
+                        <p className="font-display text-4xl text-brand">Custom</p>
                         <p className="mt-1 text-xs text-muted-foreground">
                           Contact sales for pricing
                         </p>
@@ -369,27 +352,29 @@ export default function PricingPage() {
       </section>
 
       {/* FAQ */}
-      <section className="border-t bg-muted/30">
+      <section className="border-t bg-secondary/30">
         <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
               Billing questions
             </h2>
           </div>
           <div className="mx-auto mt-12 max-w-3xl space-y-3">
             {billingFaqs.map((faq, index) => (
-              <div key={faq.question} className="rounded-lg border bg-background">
+              <div key={faq.question} className="rounded-lg border bg-card">
                 <button
                   onClick={() =>
                     setOpenFaqIndex(openFaqIndex === index ? null : index)
                   }
-                  className="flex w-full items-center justify-between p-5 text-left"
+                  aria-expanded={openFaqIndex === index}
+                  className="flex min-h-11 w-full items-center justify-between p-5 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
                 >
-                  <span className="font-semibold pr-4">{faq.question}</span>
-                  <ChevronDownIcon
-                    className={`h-5 w-5 shrink-0 text-muted-foreground transition-transform ${
+                  <span className="pr-4 font-semibold">{faq.question}</span>
+                  <ChevronDown
+                    className={`size-5 shrink-0 text-muted-foreground transition-transform ${
                       openFaqIndex === index ? 'rotate-180' : ''
                     }`}
+                    aria-hidden
                   />
                 </button>
                 {openFaqIndex === index && (
@@ -408,7 +393,7 @@ export default function PricingPage() {
       {/* CTA */}
       <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
         <div className="rounded-2xl bg-primary px-8 py-16 text-center text-primary-foreground sm:px-16">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
             Start your free trial
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
@@ -416,12 +401,8 @@ export default function PricingPage() {
           </p>
           <div className="mt-8">
             <Link href="/signup">
-              <Button
-                size="lg"
-                variant="secondary"
-                className="h-12 px-8 text-base"
-              >
-                Start Free Trial
+              <Button size="lg" variant="secondary" className="h-12 px-8 text-base">
+                Start free trial
               </Button>
             </Link>
           </div>
@@ -433,71 +414,11 @@ export default function PricingPage() {
 
 function FeatureCell({ value }: { value: boolean | string }) {
   if (typeof value === 'string') {
-    return <span className="font-medium">{value}</span>;
+    return <span className="font-medium tabular-nums">{value}</span>;
   }
   return value ? (
-    <CheckIcon className="mx-auto h-4 w-4 text-green-500" />
+    <Check className="mx-auto size-4 text-brand" aria-label="Included" />
   ) : (
-    <XIcon className="mx-auto h-4 w-4 text-muted-foreground/30" />
-  );
-}
-
-// Inline SVG icons
-
-function CheckIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 6 9 17l-5-5" />
-    </svg>
-  );
-}
-
-function XIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M18 6 6 18" />
-      <path d="m6 6 12 12" />
-    </svg>
-  );
-}
-
-function ChevronDownIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="m6 9 6 6 6-6" />
-    </svg>
+    <X className="mx-auto size-4 text-muted-foreground/30" aria-label="Not included" />
   );
 }

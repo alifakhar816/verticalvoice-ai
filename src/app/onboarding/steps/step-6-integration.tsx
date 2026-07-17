@@ -19,6 +19,7 @@ import {
   FileText,
   Check,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { StepProps, Industry } from '../types';
 
 interface IntegrationOption {
@@ -109,26 +110,36 @@ export function Step6Integration({ data, updateData }: StepProps) {
           return (
             <Card
               key={integ.id}
-              className={`transition-all ${
-                isSelected ? 'ring-2 ring-primary bg-primary/5' : ''
-              }`}
+              className={cn(
+                'transition-all',
+                isSelected && 'border-success/50 ring-1 ring-success/40'
+              )}
             >
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <div
-                    className={`flex size-10 items-center justify-center rounded-lg ${
+                    className={cn(
+                      'flex size-10 items-center justify-center rounded-lg',
                       isSelected
-                        ? 'bg-primary text-primary-foreground'
+                        ? 'bg-success/10 text-success'
                         : 'bg-muted text-muted-foreground'
-                    }`}
+                    )}
                   >
                     {integ.icon}
                   </div>
-                  {isSelected && (
-                    <Badge>
+                  {isSelected ? (
+                    <Badge variant="success">
                       <Check className="mr-1 size-3" />
                       Connected
                     </Badge>
+                  ) : (
+                    <span
+                      className="flex items-center gap-1.5 text-xs text-muted-foreground"
+                      aria-label="Not connected"
+                    >
+                      <span className="size-2 rounded-full bg-muted-foreground/40" />
+                      Not connected
+                    </span>
                   )}
                 </div>
                 <CardTitle className="text-base">{integ.name}</CardTitle>

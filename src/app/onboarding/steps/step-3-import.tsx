@@ -34,7 +34,7 @@ export function Step3Import({ data, updateData }: StepProps) {
     setTimeout(() => {
       setImporting(false);
       setImportMessage(
-        "We couldn't find enough information at this URL. Smart import isn't able to extract data automatically yet — you can fill these fields in manually in the next steps."
+        "We couldn't find enough information at this URL. Smart import isn't able to extract data automatically yet, so you can fill these fields in manually in the next steps."
       );
     }, 1200);
   };
@@ -57,7 +57,7 @@ export function Step3Import({ data, updateData }: StepProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Globe className="size-5 text-primary" />
+            <Globe className="size-5 text-muted-foreground" />
             <CardTitle>Import from Website</CardTitle>
           </div>
           <CardDescription>
@@ -80,15 +80,34 @@ export function Step3Import({ data, updateData }: StepProps) {
               {importing ? (
                 <>
                   <Loader2 className="size-4 animate-spin" />
-                  Importing...
+                  Reading...
                 </>
               ) : (
                 'Import'
               )}
             </Button>
           </div>
-          {importMessage && (
-            <div className="mt-4 flex items-start gap-2 rounded-lg border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800 dark:border-amber-900 dark:bg-amber-950/30 dark:text-amber-200">
+
+          {/* Animated "reading your site" state (shimmer sweep + live ping) */}
+          {importing && (
+            <div className="animate-vv-shimmer mt-4 rounded-lg border bg-muted/40 p-4">
+              <div className="flex items-center gap-3">
+                <span className="relative flex size-2.5 items-center justify-center">
+                  <span className="animate-vv-ping absolute inline-flex size-2.5 rounded-full bg-brand/60" />
+                  <span className="relative inline-flex size-2.5 rounded-full bg-brand" />
+                </span>
+                <p className="text-sm font-medium">Reading your site...</p>
+              </div>
+              <div className="mt-3 space-y-2" aria-hidden>
+                <div className="h-3 w-3/4 rounded bg-muted" />
+                <div className="h-3 w-1/2 rounded bg-muted" />
+                <div className="h-3 w-2/3 rounded bg-muted" />
+              </div>
+            </div>
+          )}
+
+          {importMessage && !importing && (
+            <div className="mt-4 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-sm text-warning">
               <Info className="mt-0.5 size-4 shrink-0" />
               <p>{importMessage}</p>
             </div>
@@ -99,7 +118,7 @@ export function Step3Import({ data, updateData }: StepProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <Upload className="size-5 text-primary" />
+            <Upload className="size-5 text-muted-foreground" />
             <CardTitle>Upload Files</CardTitle>
           </div>
           <CardDescription>
@@ -107,7 +126,7 @@ export function Step3Import({ data, updateData }: StepProps) {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 px-6 py-10 text-center transition-colors hover:border-primary/50">
+          <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed border-muted-foreground/25 px-6 py-10 text-center transition-colors hover:border-brand/50">
             <Upload className="mb-3 size-8 text-muted-foreground" />
             <p className="text-sm font-medium">
               Drop files here or click to upload
@@ -122,7 +141,7 @@ export function Step3Import({ data, updateData }: StepProps) {
       <Card>
         <CardHeader>
           <div className="flex items-center gap-2">
-            <FileText className="size-5 text-primary" />
+            <FileText className="size-5 text-muted-foreground" />
             <CardTitle>Paste Text</CardTitle>
           </div>
           <CardDescription>
@@ -173,9 +192,9 @@ export function Step3Import({ data, updateData }: StepProps) {
                         <Badge
                           variant={
                             field.confidence >= 0.9
-                              ? 'default'
+                              ? 'success'
                               : field.confidence >= 0.75
-                                ? 'secondary'
+                                ? 'warning'
                                 : 'destructive'
                           }
                         >

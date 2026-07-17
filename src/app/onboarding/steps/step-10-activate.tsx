@@ -11,7 +11,9 @@ import {
 } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Separator } from '@/components/ui/separator';
-import { Rocket, CheckCircle2, PartyPopper, Loader2 } from 'lucide-react';
+import { Rocket, CheckCircle2, Loader2 } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { LiveCallOrb } from '@/components/shared/live-call-orb';
 import type { StepProps } from '../types';
 
 const checklistItems = [
@@ -110,16 +112,17 @@ export function Step10Activate({ data, updateData }: StepProps) {
 
   if (activated) {
     return (
-      <div className="flex flex-col items-center justify-center py-16 text-center">
-        <div className="mb-6 flex size-24 items-center justify-center rounded-full bg-green-100 dark:bg-green-900/30">
-          <PartyPopper className="size-12 text-green-600 dark:text-green-400" />
-        </div>
-        <h2 className="text-3xl font-bold">Your Agent is Live!</h2>
+      <div className="flex flex-col items-center justify-center py-12 text-center">
+        {/* Restrained brass celebration: the equalizer goes live */}
+        <LiveCallOrb size="lg" state="live" showTimer={false} className="mb-8" />
+        <h2 className="font-display text-4xl leading-tight text-foreground">
+          Your agent is live
+        </h2>
         <p className="mt-3 max-w-md text-muted-foreground">
-          Congratulations! Your AI calling agent is now active and ready to
-          handle calls for {data.businessName || 'your business'}.
+          Your AI calling agent is now active and ready to handle calls for{' '}
+          {data.businessName || 'your business'}.
         </p>
-        <div className="mt-8 flex gap-3">
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
           <Button size="lg" onClick={() => router.push('/dashboard/overview')}>
             Go to Dashboard
           </Button>
@@ -139,10 +142,10 @@ export function Step10Activate({ data, updateData }: StepProps) {
     <div className="space-y-6">
       <Card>
         <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex size-16 items-center justify-center rounded-full bg-muted">
-            <Rocket className="size-8 text-primary" />
+          <div className="mx-auto mb-2 flex size-16 items-center justify-center rounded-full bg-accent text-brand">
+            <Rocket className="size-8" />
           </div>
-          <CardTitle className="text-xl">Ready to Go Live?</CardTitle>
+          <CardTitle className="text-xl">Ready to go live?</CardTitle>
           <CardDescription>
             Complete the checklist below to activate your AI agent.
           </CardDescription>
@@ -155,12 +158,22 @@ export function Step10Activate({ data, updateData }: StepProps) {
           return (
             <div
               key={item.id}
-              className={`flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors ${
-                checked
-                  ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30'
-                  : 'hover:bg-muted/50'
-              }`}
+              role="button"
+              tabIndex={0}
+              aria-pressed={checked}
               onClick={() => toggleItem(item.id)}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  toggleItem(item.id);
+                }
+              }}
+              className={cn(
+                'flex cursor-pointer items-start gap-3 rounded-lg border p-4 transition-colors',
+                checked
+                  ? 'border-success/40 bg-success/10'
+                  : 'hover:bg-muted/50'
+              )}
             >
               <Checkbox
                 checked={checked}
@@ -171,7 +184,7 @@ export function Step10Activate({ data, updateData }: StepProps) {
                 <div className="flex items-center gap-2">
                   <p className="text-sm font-medium">{item.label}</p>
                   {checked && (
-                    <CheckCircle2 className="size-4 text-green-600 dark:text-green-400" />
+                    <CheckCircle2 className="size-4 text-success" />
                   )}
                 </div>
                 <p className="text-xs text-muted-foreground">
@@ -197,7 +210,7 @@ export function Step10Activate({ data, updateData }: StepProps) {
           ) : (
             <Rocket className="mr-2 size-4" />
           )}
-          {activating ? 'Activating…' : 'Activate Agent'}
+          {activating ? 'Activating...' : 'Activate Agent'}
         </Button>
 
         {error && (

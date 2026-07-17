@@ -11,7 +11,8 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
-import { Phone, Clock, MessageSquare, HardDrive } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Phone, Clock, MessageSquare, HardDrive, Sparkles } from "lucide-react";
 import { createServerClient } from "@/lib/database/supabase-server";
 import { getCurrentTenantId } from "@/domain/tenants/current";
 
@@ -22,6 +23,20 @@ const DEFAULT_MINUTE_LIMIT = 1000;
 const DEFAULT_CALL_LIMIT = 500;
 const DEFAULT_SMS_LIMIT = 200;
 const DEFAULT_RECORDING_LIMIT_GB = 5;
+
+// Meter threshold logic: brass fill by default, warning as it nears the
+// limit, destructive once it is exceeded (undefined keeps the brass default).
+const WARN_AT = 80;
+function meterIndicatorClass(percent: number): string | undefined {
+  if (percent >= 100) return "bg-destructive";
+  if (percent >= WARN_AT) return "bg-warning";
+  return undefined;
+}
+function meterTextClass(percent: number): string {
+  if (percent >= 100) return "text-destructive";
+  if (percent >= WARN_AT) return "text-warning";
+  return "text-muted-foreground";
+}
 
 interface CostRow {
   telephony_cost: number;
@@ -104,7 +119,7 @@ export default async function UsagePage() {
     period = {
       start,
       end,
-      label: `${formatDate(start)} – ${formatDate(end)} (billing cycle)`,
+      label: `${formatDate(start)} to ${formatDate(end)} (billing cycle)`,
       isBillingCycle: true,
     };
   } else {
@@ -114,7 +129,7 @@ export default async function UsagePage() {
     period = {
       start,
       end,
-      label: `${formatDate(start)} – ${formatDate(now)} (calendar month-to-date — no billing cycle on file)`,
+      label: `${formatDate(start)} to ${formatDate(now)} (calendar month to date, no billing cycle on file)`,
       isBillingCycle: false,
     };
   }
@@ -201,13 +216,13 @@ export default async function UsagePage() {
     {
       item: "Telephony",
       quantity: `${Math.round(totalMinutes)} min`,
-      rate: totalMinutes > 0 ? `$${(telephonyCost / totalMinutes).toFixed(3)}/min` : "—",
+      rate: totalMinutes > 0 ? `$${(telephonyCost / totalMinutes).toFixed(3)}/min` : "n/a",
       total: `$${telephonyCost.toFixed(2)}`,
     },
     {
       item: "AI Processing",
       quantity: `${totalCalls} calls`,
-      rate: totalCalls > 0 ? `$${(aiProcessingCost / totalCalls).toFixed(3)}/call` : "—",
+      rate: totalCalls > 0 ? `$${(aiProcessingCost / totalCalls).toFixed(3)}/call` : "n/a",
       total: `$${aiProcessingCost.toFixed(2)}`,
     },
   ];
@@ -225,6 +240,35 @@ export default async function UsagePage() {
         </div>
       </div>
 
+      {/* Plan card */}
+      <Card className="bg-accent/40">
+        <CardContent className="flex flex-col gap-4 py-6 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-brand/15 text-brand">
+              <Sparkles className="size-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <p className="text-sm font-semibold">Current Plan</p>
+                <Badge variant={period.isBillingCycle ? "success" : "outline"}>
+                  {period.isBillingCycle ? "Active billing cycle" : "No billing cycle on file"}
+                </Badge>
+              </div>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Spend this period:{" "}
+                <span className="font-mono font-medium tabular-nums text-foreground">
+                  ${totalCost.toFixed(2)}
+                </span>
+              </p>
+            </div>
+          </div>
+          <Button variant="brand">
+            <Sparkles className="mr-2 size-4" />
+            Upgrade Plan
+          </Button>
+        </CardContent>
+      </Card>
+
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
         {usageItems.map((item) => (
           <Card key={item.title}>
@@ -235,10 +279,19 @@ export default async function UsagePage() {
               <item.icon className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">{item.display}</div>
-              <Progress value={item.percent} className="mt-3" />
-              <p className="mt-1 text-xs text-muted-foreground">
+              <div className="font-mono text-2xl font-bold tabular-nums">{item.display}</div>
+              <Progress
+                value={item.percent}
+                indicatorClassName={meterIndicatorClass(item.percent)}
+                className="mt-3"
+              />
+              <p className={`mt-1 font-mono text-xs tabular-nums ${meterTextClass(item.percent)}`}>
                 {item.percent}% used
+                {item.percent >= 100
+                  ? " (over limit)"
+                  : item.percent >= WARN_AT
+                    ? " (near limit)"
+                    : ""}
               </p>
             </CardContent>
           </Card>
@@ -262,16 +315,16 @@ export default async function UsagePage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="border-b text-left">
-                    <th className="pb-3 font-medium text-muted-foreground">
+                    <th className="pb-3 font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Item
                     </th>
-                    <th className="pb-3 font-medium text-muted-foreground">
+                    <th className="pb-3 font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Quantity
                     </th>
-                    <th className="pb-3 font-medium text-muted-foreground">
+                    <th className="pb-3 font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Rate
                     </th>
-                    <th className="pb-3 text-right font-medium text-muted-foreground">
+                    <th className="pb-3 text-right font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
                       Total
                     </th>
                   </tr>
@@ -279,19 +332,19 @@ export default async function UsagePage() {
                 <tbody>
                   {costRowsDisplay.map((row) => (
                     <tr key={row.item} className="border-b">
-                      <td className="py-3">{row.item}</td>
-                      <td className="py-3 text-muted-foreground">
+                      <td className="py-3 font-medium">{row.item}</td>
+                      <td className="py-3 font-mono tabular-nums text-muted-foreground">
                         {row.quantity}
                       </td>
-                      <td className="py-3 text-muted-foreground">{row.rate}</td>
-                      <td className="py-3 text-right">{row.total}</td>
+                      <td className="py-3 font-mono tabular-nums text-muted-foreground">{row.rate}</td>
+                      <td className="py-3 text-right font-mono tabular-nums">{row.total}</td>
                     </tr>
                   ))}
                   <tr>
                     <td className="pt-3 font-bold" colSpan={3}>
                       Total
                     </td>
-                    <td className="pt-3 text-right font-bold">${totalCost.toFixed(2)}</td>
+                    <td className="pt-3 text-right font-mono font-bold tabular-nums">${totalCost.toFixed(2)}</td>
                   </tr>
                 </tbody>
               </table>
@@ -311,15 +364,15 @@ export default async function UsagePage() {
           <CardContent className="space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="call-limit">Monthly Call Limit</Label>
-              <Input id="call-limit" type="number" defaultValue={DEFAULT_CALL_LIMIT} />
+              <Input id="call-limit" type="number" className="font-mono tabular-nums" defaultValue={DEFAULT_CALL_LIMIT} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="minute-limit">Monthly Minute Limit</Label>
-              <Input id="minute-limit" type="number" defaultValue={minuteLimit} />
+              <Input id="minute-limit" type="number" className="font-mono tabular-nums" defaultValue={minuteLimit} />
             </div>
             <div className="grid gap-2">
               <Label htmlFor="sms-limit">Monthly SMS Limit</Label>
-              <Input id="sms-limit" type="number" defaultValue={smsLimit} />
+              <Input id="sms-limit" type="number" className="font-mono tabular-nums" defaultValue={smsLimit} />
             </div>
             <Button className="w-full" type="button">
               Save Limits
@@ -337,7 +390,7 @@ export default async function UsagePage() {
           <CardContent className="space-y-4">
             <div className="grid gap-2">
               <Label htmlFor="alert-percent">Alert at % of Limit</Label>
-              <Input id="alert-percent" type="number" defaultValue={80} />
+              <Input id="alert-percent" type="number" className="font-mono tabular-nums" defaultValue={80} />
             </div>
             <Separator />
             <div className="space-y-4">

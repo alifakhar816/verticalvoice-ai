@@ -14,6 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Separator } from "@/components/ui/separator";
+import { Progress } from "@/components/ui/progress";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   BookOpen,
@@ -149,41 +150,26 @@ function getStatusBadge(status: "Synced" | "Processing" | "Error") {
   switch (status) {
     case "Synced":
       return (
-        <Badge
-          variant="outline"
-          className="border-green-200 bg-green-50 text-green-700 dark:border-green-800 dark:bg-green-950 dark:text-green-400"
-        >
+        <Badge variant="success">
           <CheckCircle2 className="mr-1 size-3" />
           Synced
         </Badge>
       );
     case "Processing":
       return (
-        <Badge
-          variant="outline"
-          className="border-yellow-200 bg-yellow-50 text-yellow-700 dark:border-yellow-800 dark:bg-yellow-950 dark:text-yellow-400"
-        >
+        <Badge variant="warning">
           <Loader2 className="mr-1 size-3 animate-spin" />
           Processing
         </Badge>
       );
     case "Error":
       return (
-        <Badge
-          variant="outline"
-          className="border-red-200 bg-red-50 text-red-700 dark:border-red-800 dark:bg-red-950 dark:text-red-400"
-        >
+        <Badge variant="destructive">
           <XCircle className="mr-1 size-3" />
           Error
         </Badge>
       );
   }
-}
-
-function getConfidenceColor(confidence: number) {
-  if (confidence >= 90) return "text-green-600";
-  if (confidence >= 75) return "text-yellow-600";
-  return "text-red-600";
 }
 
 export default function KnowledgePage() {
@@ -208,13 +194,13 @@ export default function KnowledgePage() {
       {/* Import Status */}
       <Card>
         <CardContent className="py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="flex flex-wrap items-center gap-4">
               <div className="flex items-center gap-2">
                 <Clock className="size-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
                   Last sync:{" "}
-                  <span className="font-medium text-foreground">
+                  <span className="font-mono font-medium text-foreground">
                     5 minutes ago
                   </span>
                 </span>
@@ -223,7 +209,7 @@ export default function KnowledgePage() {
               <div className="flex items-center gap-2">
                 <Database className="size-4 text-muted-foreground" />
                 <span className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">
+                  <span className="font-mono font-medium text-foreground">
                     156 facts
                   </span>{" "}
                   indexed
@@ -231,9 +217,9 @@ export default function KnowledgePage() {
               </div>
               <Separator orientation="vertical" className="h-4" />
               <div className="flex items-center gap-2">
-                <AlertTriangle className="size-4 text-yellow-600" />
+                <AlertTriangle className="size-4 text-warning" />
                 <span className="text-sm text-muted-foreground">
-                  <span className="font-medium text-foreground">
+                  <span className="font-mono font-medium text-foreground">
                     2 conflicts
                   </span>{" "}
                   found
@@ -262,33 +248,54 @@ export default function KnowledgePage() {
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
-                {sources.map((source) => (
-                  <div
-                    key={source.name}
-                    className="flex items-center justify-between rounded-lg border p-4"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
-                        <source.typeIcon className="size-5 text-muted-foreground" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <p className="text-sm font-medium">{source.name}</p>
-                          <Badge variant="secondary" className="text-xs">
-                            {source.type}
-                          </Badge>
-                        </div>
-                        <p className="text-xs text-muted-foreground">
-                          Updated {source.lastUpdated} &middot;{" "}
-                          {source.docCount} documents
-                        </p>
-                      </div>
-                    </div>
-                    {getStatusBadge(source.status)}
+              {sources.length === 0 ? (
+                <div className="flex flex-col items-center justify-center gap-3 rounded-lg border border-dashed py-14 text-center">
+                  <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
+                    <BookOpen className="size-6 text-muted-foreground" />
                   </div>
-                ))}
-              </div>
+                  <div>
+                    <p className="text-sm font-medium">
+                      No knowledge sources yet
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Add a website, file, or note to teach your agent.
+                    </p>
+                  </div>
+                  <Button size="sm">
+                    <Plus className="mr-2 size-4" />
+                    Add Source
+                  </Button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {sources.map((source) => (
+                    <div
+                      key={source.name}
+                      className="flex items-center justify-between rounded-lg border p-4 transition-colors hover:bg-muted/40"
+                    >
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
+                          <source.typeIcon className="size-5 text-muted-foreground" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium">{source.name}</p>
+                            <Badge variant="secondary" className="text-xs">
+                              {source.type}
+                            </Badge>
+                          </div>
+                          <p className="text-xs text-muted-foreground">
+                            Updated {source.lastUpdated} &middot;{" "}
+                            <span className="font-mono">{source.docCount}</span>{" "}
+                            documents
+                          </p>
+                        </div>
+                      </div>
+                      {getStatusBadge(source.status)}
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
 
@@ -312,19 +319,19 @@ export default function KnowledgePage() {
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b">
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
+                      <th className="pb-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Field
                       </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
+                      <th className="pb-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Value
                       </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
+                      <th className="pb-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Source
                       </th>
-                      <th className="pb-3 text-left font-medium text-muted-foreground">
+                      <th className="pb-3 text-left text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Confidence
                       </th>
-                      <th className="pb-3 text-center font-medium text-muted-foreground">
+                      <th className="pb-3 text-center text-xs font-medium uppercase tracking-wider text-muted-foreground">
                         Verified
                       </th>
                     </tr>
@@ -342,15 +349,19 @@ export default function KnowledgePage() {
                           </Badge>
                         </td>
                         <td className="py-3">
-                          <span
-                            className={`font-medium ${getConfidenceColor(fact.confidence)}`}
-                          >
-                            {fact.confidence}%
-                          </span>
+                          <div className="flex items-center gap-2">
+                            <Progress
+                              value={fact.confidence}
+                              className="h-1.5 w-20 shrink-0"
+                            />
+                            <span className="font-mono text-xs font-medium tabular-nums text-foreground">
+                              {fact.confidence}%
+                            </span>
+                          </div>
                         </td>
                         <td className="py-3 text-center">
                           {fact.verified ? (
-                            <CheckCircle2 className="mx-auto size-4 text-green-600" />
+                            <CheckCircle2 className="mx-auto size-4 text-success" />
                           ) : (
                             <XCircle className="mx-auto size-4 text-muted-foreground" />
                           )}
@@ -419,7 +430,7 @@ export default function KnowledgePage() {
                 </TabsContent>
 
                 <TabsContent value="file" className="mt-4 space-y-4">
-                  <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 text-center">
+                  <div className="flex flex-col items-center justify-center rounded-lg border-2 border-dashed p-8 text-center transition-colors hover:border-brand/40 hover:bg-accent/40">
                     <Upload className="mb-3 size-8 text-muted-foreground" />
                     <p className="text-sm font-medium">
                       Drop files here or click to browse
@@ -460,7 +471,7 @@ export default function KnowledgePage() {
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <AlertTriangle className="size-5 text-yellow-600" />
+                <AlertTriangle className="size-5 text-warning" />
                 Conflicts
               </CardTitle>
               <CardDescription>
@@ -472,9 +483,12 @@ export default function KnowledgePage() {
                 {conflicts.map((conflict) => (
                   <div
                     key={conflict.field}
-                    className="space-y-3 rounded-lg border border-yellow-200 bg-yellow-50/50 p-4 dark:border-yellow-900 dark:bg-yellow-950/30"
+                    className="space-y-3 rounded-lg border border-warning/30 bg-warning/10 p-4"
                   >
-                    <p className="text-sm font-medium">{conflict.field}</p>
+                    <div className="flex items-center gap-2">
+                      <AlertTriangle className="size-4 shrink-0 text-warning" />
+                      <p className="text-sm font-medium">{conflict.field}</p>
+                    </div>
                     <div className="space-y-2 text-xs">
                       <div className="flex items-start justify-between gap-2">
                         <Badge variant="secondary" className="shrink-0 text-xs">

@@ -19,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 
@@ -40,15 +41,21 @@ interface AvailableIntegration {
 }
 
 const healthDotColor: Record<HealthStatus, string> = {
-  healthy: "bg-green-500",
-  degraded: "bg-yellow-500",
-  error: "bg-red-500",
+  healthy: "bg-success",
+  degraded: "bg-warning",
+  error: "bg-destructive",
 };
 
 const healthBorderColor: Record<HealthStatus, string> = {
-  healthy: "border-l-green-500",
-  degraded: "border-l-yellow-500",
-  error: "border-l-red-500",
+  healthy: "border-l-success",
+  degraded: "border-l-warning",
+  error: "border-l-destructive",
+};
+
+const healthBadgeVariant: Record<HealthStatus, "success" | "warning" | "destructive"> = {
+  healthy: "success",
+  degraded: "warning",
+  error: "destructive",
 };
 
 const connectedIntegrations: ConnectedIntegration[] = [
@@ -58,7 +65,7 @@ const connectedIntegrations: ConnectedIntegration[] = [
     status: "healthy",
     statusLabel: "Connected",
     detail: "+1 (555) 123-4567",
-    lastChecked: "Last checked 2 min ago",
+    lastChecked: "2 min ago",
   },
   {
     name: "Google Calendar",
@@ -66,7 +73,7 @@ const connectedIntegrations: ConnectedIntegration[] = [
     status: "healthy",
     statusLabel: "Connected",
     detail: "3 calendars synced",
-    lastChecked: "Last checked 5 min ago",
+    lastChecked: "5 min ago",
   },
   {
     name: "SendGrid",
@@ -74,7 +81,7 @@ const connectedIntegrations: ConnectedIntegration[] = [
     status: "degraded",
     statusLabel: "Degraded",
     detail: "Email delivery delayed",
-    lastChecked: "Last checked 1 min ago",
+    lastChecked: "1 min ago",
   },
 ];
 
@@ -130,21 +137,22 @@ export default function IntegrationsPage() {
           {connectedIntegrations.map((integration) => (
             <Card
               key={integration.name}
-              className={`border-l-4 ${healthBorderColor[integration.status]}`}
+              className={`border-l-2 ${healthBorderColor[integration.status]} transition-all hover:-translate-y-0.5 hover:shadow-sm`}
             >
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
-                    <div className="flex size-10 items-center justify-center rounded-lg bg-muted">
+                    <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
                       {integration.icon}
                     </div>
                     <div>
                       <CardTitle className="text-base">
                         {integration.name}
                       </CardTitle>
-                      <div className="flex items-center gap-1.5 mt-1">
+                      <div className="mt-1 flex items-center gap-1.5">
                         <span
                           className={`inline-block size-2 rounded-full ${healthDotColor[integration.status]}`}
+                          aria-hidden
                         />
                         <span className="text-xs text-muted-foreground">
                           {integration.statusLabel}
@@ -152,12 +160,18 @@ export default function IntegrationsPage() {
                       </div>
                     </div>
                   </div>
+                  <Badge variant={healthBadgeVariant[integration.status]}>
+                    {integration.statusLabel}
+                  </Badge>
                 </div>
               </CardHeader>
               <CardContent className="space-y-3">
-                <p className="text-sm font-medium">{integration.detail}</p>
+                <p className="font-mono text-sm font-medium">
+                  {integration.detail}
+                </p>
                 <p className="text-xs text-muted-foreground">
-                  {integration.lastChecked}
+                  Last checked{" "}
+                  <span className="font-mono">{integration.lastChecked}</span>
                 </p>
                 <Separator />
                 <Button variant="outline" size="sm" className="w-full">
@@ -174,12 +188,15 @@ export default function IntegrationsPage() {
         <h2 className="text-lg font-semibold">Available Integrations</h2>
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {availableIntegrations.map((integration) => (
-            <Card key={integration.name}>
+            <Card
+              key={integration.name}
+              className="transition-all hover:-translate-y-0.5 hover:shadow-sm"
+            >
               <CardHeader>
                 <div className="flex size-12 items-center justify-center rounded-lg bg-muted">
                   {integration.icon}
                 </div>
-                <CardTitle className="text-base mt-3">
+                <CardTitle className="mt-3 text-base">
                   {integration.name}
                 </CardTitle>
                 <CardDescription>{integration.description}</CardDescription>

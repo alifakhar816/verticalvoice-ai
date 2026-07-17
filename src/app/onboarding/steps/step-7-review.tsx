@@ -136,13 +136,13 @@ function ReviewSection({ title, step, items, onEdit }: ReviewSectionProps) {
               <dt className="text-muted-foreground">{item.label}</dt>
               <dd className="text-right font-medium">
                 {item.value || (
-                  <span className="flex items-center gap-1 text-amber-500">
+                  <span className="flex items-center gap-1 text-warning">
                     <AlertTriangle className="size-3" />
                     Not set
                   </span>
                 )}
                 {item.warning && item.value && (
-                  <Badge variant="outline" className="ml-2 text-xs text-amber-500">
+                  <Badge variant="warning" className="ml-2 text-xs">
                     Review recommended
                   </Badge>
                 )}
@@ -244,14 +244,14 @@ export function Step7Review({
 
       <Separator />
 
-      <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 dark:border-amber-900 dark:bg-amber-950/30">
+      <div className="rounded-lg border border-warning/30 bg-warning/10 p-4">
         <div className="flex items-start gap-2">
-          <AlertTriangle className="mt-0.5 size-4 text-amber-500" />
+          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
           <div>
-            <p className="text-sm font-medium text-amber-800 dark:text-amber-200">
+            <p className="text-sm font-medium text-warning">
               Review your configuration
             </p>
-            <p className="mt-1 text-xs text-amber-700 dark:text-amber-300">
+            <p className="mt-1 text-xs text-warning/90">
               Make sure everything looks correct before proceeding to the
               preflight check. You can click &quot;Edit&quot; on any section to
               go back and make changes.

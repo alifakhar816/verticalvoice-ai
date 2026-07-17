@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
-import { PhoneOutgoing, Loader2, AlertTriangle } from "lucide-react";
+import { PhoneOutgoing, Loader2, AlertTriangle, Building2, ListChecks, Radio } from "lucide-react";
 import {
   Card,
   CardContent,
@@ -17,6 +17,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
+import { LiveCallOrb } from "@/components/shared/live-call-orb";
 
 interface OutboundVariable {
   name: string;
@@ -156,7 +157,7 @@ export default function OutboundCallsPage() {
     return (
       <div className="flex items-center justify-center py-24 text-muted-foreground">
         <Loader2 className="mr-2 size-5 animate-spin" />
-        Loading outbound calling settings…
+        Loading outbound calling settings...
       </div>
     );
   }
@@ -177,14 +178,57 @@ export default function OutboundCallsPage() {
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Outbound Calls</h1>
         <p className="text-muted-foreground">
-          Have your AI agent place real calls — reminders, confirmations, alerts, and outreach.
+          Have your AI agent place real calls, reminders, confirmations, alerts, and outreach.
         </p>
       </div>
 
+      {/* Stat cards */}
+      <div className="grid gap-4 sm:grid-cols-3">
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Building2 className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Industry</p>
+              <p className="text-lg font-semibold capitalize">
+                {data.industry.replace("_", " ")}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <ListChecks className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Campaign types</p>
+              <p className="font-mono text-lg font-semibold tabular-nums">
+                {data.callTypes.length}
+              </p>
+            </div>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="flex items-center gap-3 py-4">
+            <div className="flex size-10 items-center justify-center rounded-lg bg-muted text-muted-foreground">
+              <Radio className="size-5" />
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Outbound</p>
+              <Badge variant={data.allowOutbound ? "success" : "outline"}>
+                {data.allowOutbound ? "Enabled" : "Disabled"}
+              </Badge>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {!data.hasPhoneNumber && (
-        <Card className="border-yellow-500/50">
+        <Card className="border-warning/40">
           <CardContent className="flex items-start gap-3 pt-6">
-            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-yellow-600 dark:text-yellow-400" />
+            <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
             <div>
               <p className="font-medium">No phone number assigned</p>
               <p className="text-sm text-muted-foreground">
@@ -215,7 +259,7 @@ export default function OutboundCallsPage() {
         <div className="grid gap-6 md:grid-cols-[280px_1fr]">
           <Card>
             <CardHeader>
-              <CardTitle className="text-base">Call Type</CardTitle>
+              <CardTitle className="text-base">Campaigns</CardTitle>
               <CardDescription>
                 Available for your {data.industry.replace("_", " ")} business.
               </CardDescription>
@@ -228,7 +272,7 @@ export default function OutboundCallsPage() {
                   onClick={() => handleSelectType(type.id)}
                   className={`w-full rounded-lg border p-3 text-left transition-colors ${
                     selectedTypeId === type.id
-                      ? "border-primary bg-primary/5"
+                      ? "border-brand bg-accent/60"
                       : "hover:bg-muted/50"
                   }`}
                 >
@@ -240,7 +284,8 @@ export default function OutboundCallsPage() {
                   </div>
                   <p className="mt-1 text-xs text-muted-foreground">{type.description}</p>
                   {type.requiresConsent && (
-                    <p className="mt-1 text-[11px] text-yellow-600 dark:text-yellow-400">
+                    <p className="mt-1 inline-flex items-center gap-1 text-[11px] text-warning">
+                      <AlertTriangle className="size-3" />
                       Requires prior opt-in
                     </p>
                   )}
@@ -252,7 +297,7 @@ export default function OutboundCallsPage() {
           <Card>
             <CardHeader>
               <CardTitle className="text-base">
-                {selectedType ? selectedType.name : "Select a call type"}
+                {selectedType ? selectedType.name : "Select a campaign"}
               </CardTitle>
               <CardDescription>
                 {selectedType?.description}
@@ -260,59 +305,71 @@ export default function OutboundCallsPage() {
             </CardHeader>
             <CardContent>
               {selectedType && (
-                <form onSubmit={handlePlaceCall} className="space-y-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="to-number">Phone number to call</Label>
-                    <Input
-                      id="to-number"
-                      type="tel"
-                      placeholder="+1 (555) 000-0000"
-                      value={toNumber}
-                      onChange={(e) => setToNumber(e.target.value)}
-                      required
+                <div className="space-y-5">
+                  {/* Per-campaign live progress */}
+                  <div className="flex items-center justify-center rounded-lg border bg-muted/30 py-5">
+                    <LiveCallOrb
+                      size="sm"
+                      state={placingCall ? "ringing" : "idle"}
+                      showTimer={false}
                     />
                   </div>
 
-                  <Separator />
+                  <form onSubmit={handlePlaceCall} className="space-y-4">
+                    <div className="space-y-2">
+                      <Label htmlFor="to-number">Phone number to call</Label>
+                      <Input
+                        id="to-number"
+                        type="tel"
+                        className="font-mono"
+                        placeholder="+1 (555) 000-0000"
+                        value={toNumber}
+                        onChange={(e) => setToNumber(e.target.value)}
+                        required
+                      />
+                    </div>
 
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    {selectedType.variables.map((v) => (
-                      <div key={v.name} className="space-y-2">
-                        <Label htmlFor={`var-${v.name}`}>
-                          {v.label}
-                          {v.required && <span className="text-destructive"> *</span>}
-                        </Label>
-                        <Input
-                          id={`var-${v.name}`}
-                          type={
-                            v.type === "date"
-                              ? "date"
-                              : v.type === "time"
-                                ? "time"
-                                : v.type === "number" || v.type === "currency"
-                                  ? "number"
-                                  : "text"
-                          }
-                          placeholder={v.description}
-                          value={variables[v.name] ?? ""}
-                          onChange={(e) =>
-                            setVariables((prev) => ({ ...prev, [v.name]: e.target.value }))
-                          }
-                          required={v.required}
-                        />
-                      </div>
-                    ))}
-                  </div>
+                    <Separator />
 
-                  <Button type="submit" disabled={placingCall} className="w-full sm:w-auto">
-                    {placingCall ? (
-                      <Loader2 className="mr-2 size-4 animate-spin" />
-                    ) : (
-                      <PhoneOutgoing className="mr-2 size-4" />
-                    )}
-                    {placingCall ? "Placing call…" : "Place Call"}
-                  </Button>
-                </form>
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {selectedType.variables.map((v) => (
+                        <div key={v.name} className="space-y-2">
+                          <Label htmlFor={`var-${v.name}`}>
+                            {v.label}
+                            {v.required && <span className="text-destructive"> *</span>}
+                          </Label>
+                          <Input
+                            id={`var-${v.name}`}
+                            type={
+                              v.type === "date"
+                                ? "date"
+                                : v.type === "time"
+                                  ? "time"
+                                  : v.type === "number" || v.type === "currency"
+                                    ? "number"
+                                    : "text"
+                            }
+                            placeholder={v.description}
+                            value={variables[v.name] ?? ""}
+                            onChange={(e) =>
+                              setVariables((prev) => ({ ...prev, [v.name]: e.target.value }))
+                            }
+                            required={v.required}
+                          />
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button type="submit" disabled={placingCall} className="w-full sm:w-auto">
+                      {placingCall ? (
+                        <Loader2 className="mr-2 size-4 animate-spin" />
+                      ) : (
+                        <PhoneOutgoing className="mr-2 size-4" />
+                      )}
+                      {placingCall ? "Placing call..." : "Place Call"}
+                    </Button>
+                  </form>
+                </div>
               )}
             </CardContent>
           </Card>
