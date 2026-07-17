@@ -24,6 +24,10 @@ function isPublicRoute(pathname: string): boolean {
   if (PUBLIC_ROUTES.has(pathname)) return true;
   if (pathname.startsWith('/industries/')) return true;
   if (pathname.startsWith('/api/v1/webhooks/')) return true;
+  // Call-token authenticated (verifyToolToken), not session-cookie
+  // authenticated — Ultravox calls these server-to-server mid-call with no
+  // browser session to speak of.
+  if (pathname.startsWith('/api/v1/tools/')) return true;
   if (pathname.startsWith('/_next/') || pathname.startsWith('/favicon')) return true;
   return false;
 }
