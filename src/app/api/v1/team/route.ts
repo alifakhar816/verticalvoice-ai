@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/database/supabase-server";
+import { getOrCreateInternalUser } from "@/domain/users/service";
 import { z } from "zod";
 import { uuidSchema, emailSchema } from "@/lib/validation/schemas";
 import crypto from "crypto";
@@ -18,7 +19,7 @@ export async function GET(request: NextRequest) {
       error: authError,
     } = await supabase.auth.getUser();
 
-    if (authError || !user) {
+    if (authError || !user || !user.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -30,11 +31,13 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    const internalUserId = await getOrCreateInternalUser(user.id, user.email);
+
     // Verify tenant membership
     const { data: membership } = await supabase
       .from("tenant_members")
       .select("tenant_id")
-      .eq("user_id", user.id)
+      .eq("user_id", internalUserId)
       .eq("tenant_id", tenantId)
       .single();
 
@@ -68,7 +71,7 @@ export async function POST(request: NextRequest) {
       error: authError,
     } = await supabase.auth.getUser();
 
-    if (authError || !user) {
+    if (authError || !user || !user.email) {
       return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
     }
 
@@ -82,11 +85,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const internalUserId = await getOrCreateInternalUser(user.id, user.email);
+
     // Verify tenant membership and admin role
     const { data: membership } = await supabase
       .from("tenant_members")
       .select("tenant_id, role")
-      .eq("user_id", user.id)
+      .eq("user_id", internalUserId)
       .eq("tenant_id", parsed.data.tenant_id)
       .single();
 
