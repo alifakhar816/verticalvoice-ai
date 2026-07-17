@@ -1,17 +1,26 @@
 'use client';
 
-import { useState } from 'react';
+import * as React from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
+import {
+  Sparkles,
+  HeartPulse,
+  UtensilsCrossed,
+  Building2,
+  Send,
+  Clock,
+  Target,
+  CheckCircle2,
+} from 'lucide-react';
 import { brand } from '@/config/brand';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-} from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 
-// --- Intent classification logic (keyword-based, no API calls) ---
+/* -------------------------------------------------------------------------
+ * Intent classification logic (keyword-based, no API calls)
+ * ----------------------------------------------------------------------- */
 
 interface IntentResult {
   intent: string;
@@ -57,7 +66,7 @@ const intentRules: {
     confidence: 0.91,
     category: 'Restaurant',
     response:
-      'Great question! We update our specials daily. Today we have a pan-seared salmon and a mushroom risotto. We also have vegan, vegetarian, and gluten-free options available. Would you like me to go through them?',
+      'Great question. We update our specials daily. Today we have a pan-seared salmon and a mushroom risotto. We also have vegan, vegetarian, and gluten-free options. Would you like me to go through them?',
   },
   {
     keywords: ['listing', 'property', 'house', 'home', 'condo', 'apartment', 'bedroom', 'bath'],
@@ -65,7 +74,7 @@ const intentRules: {
     confidence: 0.94,
     category: 'Real Estate',
     response:
-      'Thanks for your interest! Could you tell me a bit more about what you are looking for -- number of bedrooms, preferred neighborhood, and your budget range? I will match you with our best available listings.',
+      'Thanks for your interest. Could you tell me a bit more about what you are looking for, number of bedrooms, preferred neighborhood, and your budget range? I will match you with our best available listings.',
   },
   {
     keywords: ['showing', 'tour', 'view', 'open house', 'visit property'],
@@ -81,7 +90,7 @@ const intentRules: {
     confidence: 0.89,
     category: 'General',
     response:
-      'I can help with pricing information. Could you let me know which specific service or product you are asking about so I can give you accurate details?',
+      'I can help with pricing information. Could you let me know which service or product you are asking about so I can give you accurate details?',
   },
   {
     keywords: ['hours', 'open', 'close', 'when', 'time'],
@@ -94,7 +103,7 @@ const intentRules: {
   {
     keywords: ['insurance', 'coverage', 'copay', 'deductible'],
     intent: 'Insurance Question',
-    confidence: 0.90,
+    confidence: 0.9,
     category: 'Healthcare',
     response:
       'We accept most major insurance plans including Blue Cross, Aetna, Cigna, and UnitedHealthcare. I can verify your specific coverage if you provide your insurance ID number.',
@@ -105,7 +114,7 @@ const intentRules: {
     confidence: 0.88,
     category: 'Restaurant',
     response:
-      'I understand -- we are quite popular tonight! I can add you to our waitlist. The estimated wait is about 25 minutes. Can I get your name and phone number?',
+      'I understand, we are quite popular tonight. I can add you to our waitlist. The estimated wait is about 25 minutes. Can I get your name and phone number?',
   },
 ];
 
@@ -140,60 +149,45 @@ function classifyIntent(input: string): IntentResult {
   };
 }
 
-// --- Demo scenarios ---
+/* -------------------------------------------------------------------------
+ * Industry switcher + scenarios
+ * ----------------------------------------------------------------------- */
+
+const BRAND = 'var(--brand)';
+const ACCENTS: Record<string, string> = {
+  All: BRAND,
+  Healthcare: 'var(--vertical-healthcare)',
+  Restaurant: 'var(--vertical-restaurant)',
+  'Real Estate': 'var(--vertical-realestate)',
+};
+
+const industryTabs = [
+  { key: 'All', icon: Sparkles },
+  { key: 'Healthcare', icon: HeartPulse },
+  { key: 'Restaurant', icon: UtensilsCrossed },
+  { key: 'Real Estate', icon: Building2 },
+] as const;
 
 const scenarios = [
   {
-    label: 'Healthcare',
-    icon: HeartPulseIcon,
+    category: 'Healthcare',
     input: 'I need to schedule an appointment with Dr. Smith for a checkup next week',
+    label: 'Book an appointment',
   },
   {
-    label: 'Restaurant',
-    icon: UtensilsIcon,
+    category: 'Restaurant',
     input: 'I would like to make a reservation for 4 people this Saturday at 7 PM',
+    label: 'Make a reservation',
   },
   {
-    label: 'Real Estate',
-    icon: BuildingIcon,
+    category: 'Real Estate',
     input: 'I am interested in the 3 bedroom listing on Oak Street',
-  },
-];
-
-// --- Sample transcript ---
-
-const sampleTranscript = [
-  {
-    role: 'caller' as const,
-    text: 'Hi, I need to schedule an appointment with Dr. Martinez.',
+    label: 'Ask about a listing',
   },
   {
-    role: 'agent' as const,
-    text: 'Of course! I would be happy to help you schedule an appointment with Dr. Martinez. Are you a new patient or returning?',
-  },
-  {
-    role: 'caller' as const,
-    text: 'I am a returning patient. My name is Sarah Johnson.',
-  },
-  {
-    role: 'agent' as const,
-    text: 'Welcome back, Sarah! I found your file. Dr. Martinez has openings on Wednesday at 2:00 PM and Friday at 11:00 AM. Do either of those work for you?',
-  },
-  {
-    role: 'caller' as const,
-    text: 'Wednesday at 2 works perfectly.',
-  },
-  {
-    role: 'agent' as const,
-    text: 'You are all set for Wednesday at 2:00 PM with Dr. Martinez. I will send a confirmation to the email on file. Is there anything else I can help with?',
-  },
-  {
-    role: 'caller' as const,
-    text: 'No, that is great. Thank you!',
-  },
-  {
-    role: 'agent' as const,
-    text: 'You are welcome, Sarah! We will see you on Wednesday. Have a great day!',
+    category: 'General',
+    input: 'What are your hours today?',
+    label: 'Check the hours',
   },
 ];
 
@@ -203,48 +197,335 @@ const stats = [
   { label: 'Customer satisfaction', value: '4.8/5' },
 ];
 
+const tint = (accent: string, pct: number) =>
+  `color-mix(in oklab, ${accent} ${pct}%, transparent)`;
+
+/* -------------------------------------------------------------------------
+ * Reduced-motion hook
+ * ----------------------------------------------------------------------- */
+
+function usePrefersReducedMotion(): boolean {
+  const [reduced, setReduced] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(prefers-reduced-motion: reduce)');
+    const update = () => setReduced(mq.matches);
+    update();
+    mq.addEventListener('change', update);
+    return () => mq.removeEventListener('change', update);
+  }, []);
+  return reduced;
+}
+
+/* -------------------------------------------------------------------------
+ * Streaming agent bubble (typewriter)
+ * ----------------------------------------------------------------------- */
+
+interface Message {
+  id: number;
+  role: 'caller' | 'agent';
+  text: string;
+  meta?: { category: string; intent: string; confidence: number };
+}
+
+function AgentBubble({
+  message,
+  onDone,
+}: {
+  message: Message;
+  onDone?: () => void;
+}) {
+  const reduced = usePrefersReducedMotion();
+  const [shown, setShown] = useState(reduced ? message.text.length : 0);
+
+  useEffect(() => {
+    if (reduced) {
+      setShown(message.text.length);
+      onDone?.();
+      return;
+    }
+    let i = 0;
+    setShown(0);
+    const id = window.setInterval(() => {
+      i += 1;
+      setShown(i);
+      if (i >= message.text.length) {
+        window.clearInterval(id);
+        onDone?.();
+      }
+    }, 18);
+    return () => window.clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [message.id, reduced]);
+
+  const typing = shown < message.text.length;
+  const accent = ACCENTS[message.meta?.category ?? 'General'] ?? BRAND;
+
+  return (
+    <div className="flex flex-col items-start gap-2">
+      {message.meta ? (
+        <div className="flex flex-wrap items-center gap-2 pl-1">
+          <Badge
+            variant="outline"
+            className="text-[11px]"
+            style={{ borderColor: tint(accent, 40), color: accent }}
+          >
+            {message.meta.category}
+          </Badge>
+          <span className="text-xs text-muted-foreground">
+            {message.meta.intent} ·{' '}
+            <span className="font-mono tabular-nums">
+              {(message.meta.confidence * 100).toFixed(0)}%
+            </span>{' '}
+            confidence
+          </span>
+        </div>
+      ) : null}
+      <span className="inline-block max-w-[85%] rounded-lg rounded-bl-sm border border-brand/20 bg-accent px-4 py-2.5 text-sm leading-relaxed text-accent-foreground">
+        {message.text.slice(0, shown)}
+        {typing ? (
+          <span
+            aria-hidden
+            className="ml-0.5 inline-block h-4 w-px translate-y-0.5 bg-current align-middle"
+          />
+        ) : null}
+      </span>
+    </div>
+  );
+}
+
+/* -------------------------------------------------------------------------
+ * Page
+ * ----------------------------------------------------------------------- */
+
 export default function DemoPage() {
+  const [activeIndustry, setActiveIndustry] = useState<string>('All');
+  const [messages, setMessages] = useState<Message[]>([
+    {
+      id: 0,
+      role: 'agent',
+      text: 'Thanks for calling. How can I help you today?',
+    },
+  ]);
   const [input, setInput] = useState('');
-  const [result, setResult] = useState<IntentResult | null>(null);
+  const [thinking, setThinking] = useState(false);
+  const idRef = useRef(1);
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  const handleClassify = () => {
-    if (!input.trim()) return;
-    setResult(classifyIntent(input));
+  const scrollToBottom = () => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({
+        top: scrollRef.current.scrollHeight,
+        behavior: 'smooth',
+      });
+    });
   };
 
-  const handleScenario = (text: string) => {
-    setInput(text);
-    setResult(classifyIntent(text));
+  const send = (raw: string) => {
+    const text = raw.trim();
+    if (!text || thinking) return;
+
+    const callerMsg: Message = { id: idRef.current++, role: 'caller', text };
+    setMessages((prev) => [...prev, callerMsg]);
+    setInput('');
+    setThinking(true);
+    scrollToBottom();
+
+    const result = classifyIntent(text);
+    window.setTimeout(() => {
+      setThinking(false);
+      setMessages((prev) => [
+        ...prev,
+        {
+          id: idRef.current++,
+          role: 'agent',
+          text: result.response,
+          meta: {
+            category: result.category,
+            intent: result.intent,
+            confidence: result.confidence,
+          },
+        },
+      ]);
+      scrollToBottom();
+    }, 650);
   };
+
+  const visibleScenarios = scenarios.filter(
+    (s) => activeIndustry === 'All' || s.category === activeIndustry
+  );
+
+  const headerAccent = ACCENTS[activeIndustry] ?? BRAND;
 
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
-        <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
+      <section className="relative overflow-hidden border-b">
+        <div className="relative mx-auto max-w-7xl px-4 py-20 sm:px-6 sm:py-24 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <Badge variant="secondary" className="mb-6">
-              Interactive Demo
+            <Badge variant="outline" className="mb-6">
+              Interactive demo
             </Badge>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-              See {brand.name} in Action
+            <h1 className="font-display text-4xl tracking-tight sm:text-5xl lg:text-6xl">
+              Talk to the agent
             </h1>
             <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl">
-              Try the intent classifier, explore demo scenarios, and see how a
-              real AI-handled call looks from start to finish.
+              Type what a caller might say and watch the agent classify the
+              intent and respond in real time. Switch industries to see how the
+              same words land differently.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Stats Bar */}
-      <section className="border-y bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+      {/* Simulator */}
+      <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+        {/* Industry tabs */}
+        <div
+          className="flex flex-wrap gap-1 border-b"
+          role="tablist"
+          aria-label="Industry"
+        >
+          {industryTabs.map((tab) => {
+            const active = activeIndustry === tab.key;
+            const accent = ACCENTS[tab.key];
+            return (
+              <button
+                key={tab.key}
+                role="tab"
+                aria-selected={active}
+                onClick={() => setActiveIndustry(tab.key)}
+                className="relative -mb-px flex min-h-11 items-center gap-2 px-4 py-2.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+                style={{
+                  color: active ? accent : 'var(--muted-foreground)',
+                }}
+              >
+                <tab.icon className="size-4" aria-hidden />
+                {tab.key}
+                {active ? (
+                  <span
+                    aria-hidden
+                    className="absolute inset-x-2 -bottom-px h-0.5 rounded-full"
+                    style={{ backgroundColor: accent }}
+                  />
+                ) : null}
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Chat window */}
+        <Card className="mt-6 overflow-hidden p-0">
+          {/* Header bar */}
+          <div className="flex items-center gap-3 border-b bg-secondary/40 px-5 py-3">
+            <span className="relative inline-flex" style={{ color: headerAccent }}>
+              <span
+                aria-hidden
+                className="absolute inline-flex size-2.5 rounded-full opacity-70 animate-vv-ping"
+                style={{ backgroundColor: 'currentColor' }}
+              />
+              <span
+                className="relative inline-flex size-2.5 rounded-full"
+                style={{ backgroundColor: 'currentColor' }}
+              />
+            </span>
+            <span className="text-sm font-medium">
+              {activeIndustry === 'All' ? 'VerticalVoice' : activeIndustry} agent
+            </span>
+            <span className="ml-auto font-mono text-xs text-muted-foreground">
+              live
+            </span>
+          </div>
+
+          {/* Messages */}
+          <div
+            ref={scrollRef}
+            className="flex max-h-[26rem] min-h-[20rem] flex-col gap-4 overflow-y-auto p-5"
+          >
+            {messages.map((msg) =>
+              msg.role === 'agent' ? (
+                <AgentBubble key={msg.id} message={msg} onDone={scrollToBottom} />
+              ) : (
+                <div key={msg.id} className="flex justify-end">
+                  <span className="inline-block max-w-[85%] rounded-lg rounded-br-sm bg-secondary px-4 py-2.5 text-sm leading-relaxed text-secondary-foreground">
+                    {msg.text}
+                  </span>
+                </div>
+              )
+            )}
+            {thinking ? (
+              <div className="flex items-center gap-2 pl-1 text-muted-foreground">
+                <span className="flex gap-1">
+                  {[0, 1, 2].map((i) => (
+                    <span
+                      key={i}
+                      className="size-1.5 rounded-full bg-current animate-vv-eq"
+                      style={{ animationDelay: `${i * 0.15}s` }}
+                    />
+                  ))}
+                </span>
+                <span className="text-xs">Agent is thinking</span>
+              </div>
+            ) : null}
+          </div>
+
+          {/* Quick prompts */}
+          <div className="flex flex-wrap gap-2 border-t px-5 py-3">
+            {visibleScenarios.map((scenario) => (
+              <button
+                key={scenario.label}
+                onClick={() => send(scenario.input)}
+                disabled={thinking}
+                className="rounded-full border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground disabled:opacity-50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand"
+              >
+                {scenario.label}
+              </button>
+            ))}
+          </div>
+
+          {/* Input */}
+          <div className="border-t p-4">
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                send(input);
+              }}
+              className="flex gap-2"
+            >
+              <label htmlFor="caller-input" className="sr-only">
+                What the caller says
+              </label>
+              <input
+                id="caller-input"
+                type="text"
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                placeholder="Type what a caller might say..."
+                className="h-11 flex-1 rounded-lg border bg-card px-4 text-sm focus:border-brand focus:outline-none focus:ring-2 focus:ring-brand"
+              />
+              <Button
+                type="submit"
+                size="lg"
+                className="h-11 gap-2"
+                disabled={thinking || !input.trim()}
+              >
+                <Send className="size-4" aria-hidden />
+                <span className="hidden sm:inline">Send</span>
+              </Button>
+            </form>
+          </div>
+        </Card>
+      </section>
+
+      {/* Stats */}
+      <section className="border-y bg-secondary/30">
+        <div className="mx-auto max-w-7xl px-4 py-10 sm:px-6 lg:px-8">
           <div className="grid grid-cols-3 gap-8 text-center">
             {stats.map((stat) => (
               <div key={stat.label}>
-                <p className="text-2xl font-bold sm:text-3xl">{stat.value}</p>
+                <p className="font-display text-2xl tabular-nums sm:text-3xl">
+                  {stat.value}
+                </p>
                 <p className="mt-1 text-sm text-muted-foreground">
                   {stat.label}
                 </p>
@@ -254,137 +535,28 @@ export default function DemoPage() {
         </div>
       </section>
 
-      {/* Intent Simulator */}
-      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-3xl">
-          <div className="text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Try the intent classifier
-            </h2>
-            <p className="mt-4 text-lg text-muted-foreground">
-              Type something a caller might say and see how the AI classifies
-              intent and generates a response.
-            </p>
-          </div>
-
-          {/* Scenario buttons */}
-          <div className="mt-8 flex flex-wrap justify-center gap-3">
-            {scenarios.map((scenario) => (
-              <Button
-                key={scenario.label}
-                variant="outline"
-                size="sm"
-                onClick={() => handleScenario(scenario.input)}
-                className="gap-2"
-              >
-                <scenario.icon className="h-4 w-4" />
-                {scenario.label}
-              </Button>
-            ))}
-          </div>
-
-          {/* Input */}
-          <div className="mt-8">
-            <div className="flex gap-3">
-              <input
-                type="text"
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleClassify()}
-                placeholder="Type what a caller might say..."
-                className="flex-1 rounded-lg border bg-background px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-              />
-              <Button onClick={handleClassify} size="lg">
-                Classify
-              </Button>
-            </div>
-          </div>
-
-          {/* Result */}
-          {result && (
-            <Card className="mt-6">
-              <CardHeader className="pb-3">
-                <div className="flex flex-wrap items-center gap-3">
-                  <Badge>{result.category}</Badge>
-                  <Badge variant="outline">{result.intent}</Badge>
-                  <span className="text-sm text-muted-foreground">
-                    {(result.confidence * 100).toFixed(0)}% confidence
-                  </span>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="rounded-lg bg-muted/50 p-4">
-                  <p className="mb-2 text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                    AI Agent Response
-                  </p>
-                  <p className="text-sm leading-relaxed">{result.response}</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
-      </section>
-
-      {/* Sample Transcript */}
-      <section className="border-y bg-muted/30">
-        <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-3xl">
-            <div className="text-center">
-              <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-                Sample call transcript
-              </h2>
-              <p className="mt-4 text-lg text-muted-foreground">
-                A real conversation between a caller and a VerticalVoice AI
-                healthcare agent.
-              </p>
-            </div>
-
-            <div className="mt-12 space-y-4">
-              {sampleTranscript.map((msg, index) => (
-                <div
-                  key={index}
-                  className={`flex ${
-                    msg.role === 'agent' ? 'justify-start' : 'justify-end'
-                  }`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-2xl px-4 py-3 ${
-                      msg.role === 'agent'
-                        ? 'rounded-bl-md bg-primary/10 text-foreground'
-                        : 'rounded-br-md bg-primary text-primary-foreground'
-                    }`}
-                  >
-                    <p className="mb-1 text-[10px] font-semibold uppercase tracking-wider opacity-60">
-                      {msg.role === 'agent' ? 'AI Agent' : 'Caller'}
-                    </p>
-                    <p className="text-sm leading-relaxed">{msg.text}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            <div className="mt-8 flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <ClockIcon className="h-4 w-4" />
-                Call duration: 1m 42s
-              </div>
-              <div className="flex items-center gap-2">
-                <TargetIcon className="h-4 w-4" />
-                Intent: Schedule Appointment
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                Outcome: Booked
-              </div>
-            </div>
-          </div>
+      {/* Sample outcome */}
+      <section className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
+        <div className="flex flex-wrap justify-center gap-6 text-sm text-muted-foreground">
+          <span className="flex items-center gap-2">
+            <Clock className="size-4" aria-hidden />
+            Call duration: 1m 42s
+          </span>
+          <span className="flex items-center gap-2">
+            <Target className="size-4" aria-hidden />
+            Intent: Schedule Appointment
+          </span>
+          <span className="flex items-center gap-2">
+            <CheckCircle2 className="size-4 text-success" aria-hidden />
+            Outcome: Booked
+          </span>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
+      <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
         <div className="rounded-2xl bg-primary px-8 py-16 text-center text-primary-foreground sm:px-16">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+          <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
             Ready to try it with your own business?
           </h2>
           <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
@@ -392,150 +564,13 @@ export default function DemoPage() {
           </p>
           <div className="mt-8">
             <Link href="/signup">
-              <Button
-                size="lg"
-                variant="secondary"
-                className="h-12 px-8 text-base"
-              >
-                Start Free Setup
+              <Button size="lg" variant="secondary" className="h-12 px-8 text-base">
+                {brand.copy.ctaButton}
               </Button>
             </Link>
           </div>
         </div>
       </section>
     </>
-  );
-}
-
-// Inline SVG icons
-
-function HeartPulseIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-      <path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27" />
-    </svg>
-  );
-}
-
-function UtensilsIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M3 2v7c0 1.1.9 2 2 2h4a2 2 0 0 0 2-2V2" />
-      <path d="M7 2v20" />
-      <path d="M21 15V2v0a5 5 0 0 0-5 5v6c0 1.1.9 2 2 2h3Zm0 0v7" />
-    </svg>
-  );
-}
-
-function BuildingIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
-      <path d="M9 22v-4h6v4" />
-      <path d="M8 6h.01" />
-      <path d="M16 6h.01" />
-      <path d="M12 6h.01" />
-      <path d="M12 10h.01" />
-      <path d="M12 14h.01" />
-      <path d="M16 10h.01" />
-      <path d="M16 14h.01" />
-      <path d="M8 10h.01" />
-      <path d="M8 14h.01" />
-    </svg>
-  );
-}
-
-function ClockIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <polyline points="12 6 12 12 16 14" />
-    </svg>
-  );
-}
-
-function TargetIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <circle cx="12" cy="12" r="10" />
-      <circle cx="12" cy="12" r="6" />
-      <circle cx="12" cy="12" r="2" />
-    </svg>
-  );
-}
-
-function CheckCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <path d="m9 11 3 3L22 4" />
-    </svg>
   );
 }

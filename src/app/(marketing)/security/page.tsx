@@ -1,30 +1,46 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import {
+  Shield,
+  ShieldCheck,
+  Lock,
+  ClipboardList,
+  Database,
+  Server,
+  Globe,
+  KeyRound,
+  Check,
+  ShieldAlert,
+  Salad,
+  Scale,
+} from 'lucide-react';
 import { brand } from '@/config/brand';
 import { Button } from '@/components/ui/button';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const metadata: Metadata = {
-  title: 'Security & Privacy | VerticalVoice AI',
+  title: 'Security and Privacy | VerticalVoice AI',
   description:
     'Enterprise-grade security for every call. Learn about our encryption, compliance, and data handling practices.',
 };
 
-const securitySections = [
+const badges = [
+  { label: 'SOC 2', sublabel: 'Type II ready', icon: ShieldCheck },
+  { label: 'HIPAA', sublabel: 'Ready architecture', icon: Shield },
+  { label: 'AES-256', sublabel: 'Encryption at rest', icon: Lock },
+  { label: 'Data residency', sublabel: 'Regional isolation', icon: Globe },
+];
+
+const sections = [
   {
     title: 'Encryption',
     subtitle: 'Your data is protected at every layer',
-    icon: ShieldIcon,
+    icon: Lock,
     items: [
       {
         label: 'AES-256 at rest',
         description:
-          'All stored data -- call recordings, transcripts, and configuration -- is encrypted with AES-256, the same standard used by governments and financial institutions.',
+          'All stored data, call recordings, transcripts, and configuration, is encrypted with AES-256, the standard used by governments and financial institutions.',
       },
       {
         label: 'TLS 1.3 in transit',
@@ -39,12 +55,12 @@ const securitySections = [
     ],
   },
   {
-    title: 'Access Control',
+    title: 'Access control',
     subtitle: 'Granular permissions for every team member',
-    icon: LockIcon,
+    icon: KeyRound,
     items: [
       {
-        label: 'Row Level Security (RLS)',
+        label: 'Row Level Security',
         description:
           'Database-level isolation ensures each organization can only access its own data. No shared tables, no cross-tenant leaks.',
       },
@@ -61,9 +77,9 @@ const securitySections = [
     ],
   },
   {
-    title: 'Audit Logging',
+    title: 'Audit logging',
     subtitle: 'Complete visibility into every action',
-    icon: ClipboardListIcon,
+    icon: ClipboardList,
     items: [
       {
         label: 'Comprehensive action logging',
@@ -78,41 +94,19 @@ const securitySections = [
       {
         label: 'Real-time alerts',
         description:
-          'Set up notifications for sensitive actions -- bulk data exports, permission changes, or unusual login patterns.',
+          'Set up notifications for sensitive actions, bulk data exports, permission changes, or unusual login patterns.',
       },
     ],
   },
   {
-    title: 'Healthcare Compliance',
-    subtitle: 'Built for HIPAA from the ground up',
-    icon: HeartIcon,
-    items: [
-      {
-        label: 'HIPAA-ready architecture',
-        description:
-          'Our infrastructure is designed to meet HIPAA Security Rule requirements, including physical, technical, and administrative safeguards.',
-      },
-      {
-        label: 'Business Associate Agreement (BAA)',
-        description:
-          'Enterprise customers handling PHI can execute a BAA with VerticalVoice AI, establishing our obligations under HIPAA.',
-      },
-      {
-        label: 'PHI handling practices',
-        description:
-          'Protected Health Information is handled with minimum-necessary principles, access logging, and automatic de-identification where possible.',
-      },
-    ],
-  },
-  {
-    title: 'Data Handling',
+    title: 'Data handling',
     subtitle: 'You control your data, always',
-    icon: DatabaseIcon,
+    icon: Database,
     items: [
       {
         label: 'Data retention policies',
         description:
-          'Configure how long call recordings and transcripts are stored. Choose from 30, 90, 180 days, or custom retention periods.',
+          'Configure how long call recordings and transcripts are stored. Choose 30, 90, or 180 days, or a custom retention period.',
       },
       {
         label: 'Right to deletion',
@@ -122,14 +116,14 @@ const securitySections = [
       {
         label: 'Data portability',
         description:
-          'Export all your data -- recordings, transcripts, analytics, configurations -- in standard formats (JSON, CSV, WAV) at any time.',
+          'Export all your data, recordings, transcripts, analytics, and configurations, in standard formats (JSON, CSV, WAV) at any time.',
       },
     ],
   },
   {
     title: 'Infrastructure',
     subtitle: 'Enterprise-grade reliability and testing',
-    icon: ServerIcon,
+    icon: Server,
     items: [
       {
         label: 'SOC 2 Type II readiness',
@@ -144,86 +138,106 @@ const securitySections = [
       {
         label: '99.9% uptime SLA',
         description:
-          'Enterprise customers receive a 99.9% uptime guarantee backed by service credits. Our multi-region architecture ensures high availability.',
+          'Enterprise customers receive a 99.9% uptime guarantee backed by service credits, on a multi-region architecture built for high availability.',
       },
     ],
   },
 ];
 
-const complianceBadges = [
+const guards = [
   {
-    label: 'SOC 2',
-    sublabel: 'Type II Ready',
-    gradient: 'from-blue-600 to-blue-400',
+    title: 'Emergency guard',
+    industry: 'Healthcare',
+    accent: 'var(--vertical-healthcare)',
+    icon: ShieldAlert,
+    description:
+      'The healthcare agent detects urgent symptoms and transfers to on-call staff or emergency services. It is an administrative assistant only and never gives clinical advice.',
   },
   {
-    label: 'HIPAA',
-    sublabel: 'Compliant',
-    gradient: 'from-emerald-600 to-emerald-400',
+    title: 'Allergen guard',
+    industry: 'Restaurant',
+    accent: 'var(--vertical-restaurant)',
+    icon: Salad,
+    description:
+      'The restaurant agent answers allergen questions from your verified menu data only. It never guesses on ingredients and flags anything it cannot confirm for a human to review.',
   },
   {
-    label: 'GDPR',
-    sublabel: 'Compliant',
-    gradient: 'from-purple-600 to-purple-400',
-  },
-  {
-    label: 'TLS 1.3',
-    sublabel: 'Encrypted',
-    gradient: 'from-amber-600 to-amber-400',
+    title: 'Fair-housing guard',
+    industry: 'Real Estate',
+    accent: 'var(--vertical-realestate)',
+    icon: Scale,
+    description:
+      'The real estate agent enforces fair-housing rules in code. It describes properties by objective features only and never steers based on any protected class.',
   },
 ];
+
+const tint = (accent: string, pct: number) =>
+  `color-mix(in oklab, ${accent} ${pct}%, transparent)`;
 
 export default function SecurityPage() {
   return (
     <>
       {/* Hero */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
-        <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8">
+      <section className="relative overflow-hidden border-b">
+        <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-28 lg:px-8">
           <div className="mx-auto max-w-3xl text-center">
-            <div className="mx-auto mb-6 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary/10">
-              <ShieldIcon className="h-8 w-8 text-primary" />
+            <div className="mx-auto mb-6 flex size-16 items-center justify-center rounded-2xl bg-accent text-brand">
+              <Shield className="size-8" aria-hidden />
             </div>
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
+            <h1 className="font-display text-4xl tracking-tight sm:text-5xl lg:text-6xl">
               Enterprise-grade security for every call
             </h1>
             <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl">
               Your callers trust you with their information. We take that
-              responsibility seriously with encryption, compliance, and
+              responsibility seriously, with encryption, compliance, and
               transparency at every level.
             </p>
           </div>
         </div>
       </section>
 
-      {/* Security Sections */}
-      {securitySections.map((section, sectionIndex) => (
+      {/* Badge grid */}
+      <section className="border-b bg-secondary/30">
+        <div className="mx-auto max-w-7xl px-4 py-16 sm:px-6 lg:px-8">
+          <div className="grid grid-cols-2 gap-6 sm:grid-cols-4">
+            {badges.map((badge) => (
+              <Card key={badge.label} className="p-6 text-center">
+                <div className="mx-auto mb-3 flex size-12 items-center justify-center rounded-xl bg-accent text-brand">
+                  <badge.icon className="size-6" aria-hidden />
+                </div>
+                <div className="font-display text-xl">{badge.label}</div>
+                <div className="mt-1 text-sm text-muted-foreground">
+                  {badge.sublabel}
+                </div>
+              </Card>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* Security sections */}
+      {sections.map((section, index) => (
         <section
           key={section.title}
-          className={sectionIndex % 2 === 1 ? 'border-y bg-muted/30' : ''}
+          className={index % 2 === 1 ? 'border-y bg-secondary/30' : ''}
         >
           <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
             <div className="flex flex-col gap-12 lg:flex-row lg:items-start">
-              {/* Section header */}
-              <div className="lg:w-1/3 lg:sticky lg:top-24">
-                <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <section.icon className="h-6 w-6 text-primary" />
+              <div className="lg:sticky lg:top-24 lg:w-1/3">
+                <div className="mb-4 flex size-12 items-center justify-center rounded-xl bg-accent text-brand">
+                  <section.icon className="size-6" aria-hidden />
                 </div>
-                <h2 className="text-2xl font-bold tracking-tight sm:text-3xl">
+                <h2 className="font-display text-2xl tracking-tight sm:text-3xl">
                   {section.title}
                 </h2>
-                <p className="mt-2 text-muted-foreground">
-                  {section.subtitle}
-                </p>
+                <p className="mt-2 text-muted-foreground">{section.subtitle}</p>
               </div>
-
-              {/* Section items */}
               <div className="flex-1 space-y-6">
                 {section.items.map((item) => (
                   <Card key={item.label}>
                     <CardHeader className="pb-2">
                       <CardTitle className="flex items-center gap-2 text-base">
-                        <CheckCircleIcon className="h-5 w-5 text-green-500" />
+                        <Check className="size-5 text-brand" aria-hidden />
                         {item.label}
                       </CardTitle>
                     </CardHeader>
@@ -240,217 +254,90 @@ export default function SecurityPage() {
         </section>
       ))}
 
-      {/* Compliance Badges */}
-      <section className="border-t bg-muted/30">
+      {/* Per-vertical guards */}
+      <section className="border-t">
         <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
           <div className="mx-auto max-w-2xl text-center">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Compliance and certifications
+            <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
+              Guardrails for every vertical
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              We hold ourselves to the highest security standards.
+              Each industry pack ships with a hard safety boundary, enforced in
+              the agent itself, not left to a prompt.
             </p>
           </div>
-          <div className="mx-auto mt-12 grid max-w-3xl grid-cols-2 gap-6 sm:grid-cols-4">
-            {complianceBadges.map((badge) => (
-              <div
-                key={badge.label}
-                className="flex flex-col items-center gap-3"
+          <div className="mt-16 grid gap-8 lg:grid-cols-3">
+            {guards.map((guard) => (
+              <Card
+                key={guard.title}
+                className="overflow-hidden p-0"
+                style={{
+                  borderColor: tint(guard.accent, 40),
+                  backgroundColor: tint(guard.accent, 5),
+                }}
               >
                 <div
-                  className={`flex h-20 w-20 items-center justify-center rounded-2xl bg-gradient-to-br ${badge.gradient} text-white shadow-lg`}
-                >
-                  <span className="text-lg font-bold">{badge.label}</span>
+                  aria-hidden
+                  className="h-1 w-full"
+                  style={{ backgroundColor: guard.accent }}
+                />
+                <div className="p-8">
+                  <div
+                    className="flex size-12 items-center justify-center rounded-xl"
+                    style={{
+                      backgroundColor: tint(guard.accent, 14),
+                      color: guard.accent,
+                    }}
+                  >
+                    <guard.icon className="size-6" aria-hidden />
+                  </div>
+                  <p
+                    className="mt-5 text-xs font-medium uppercase tracking-wide"
+                    style={{ color: guard.accent }}
+                  >
+                    {guard.industry}
+                  </p>
+                  <h3 className="mt-1 font-display text-xl">{guard.title}</h3>
+                  <p className="mt-3 text-sm leading-relaxed text-muted-foreground">
+                    {guard.description}
+                  </p>
                 </div>
-                <span className="text-sm font-medium text-muted-foreground">
-                  {badge.sublabel}
-                </span>
-              </div>
+              </Card>
             ))}
           </div>
         </div>
       </section>
 
       {/* CTA */}
-      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-        <div className="rounded-2xl bg-primary px-8 py-16 text-center text-primary-foreground sm:px-16">
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Talk to our security team
-          </h2>
-          <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
-            Have questions about compliance, data handling, or custom security
-            requirements? Our team is ready to help.
-          </p>
-          <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-            <Link href={`mailto:${brand.support.email}`}>
-              <Button
-                size="lg"
-                variant="secondary"
-                className="h-12 px-8 text-base"
-              >
-                Contact Security Team
-              </Button>
-            </Link>
-            <Link href={brand.support.docs}>
-              <Button
-                size="lg"
-                variant="outline"
-                className="h-12 border-primary-foreground/20 px-8 text-base text-primary-foreground hover:bg-primary-foreground/10"
-              >
-                Read Security Docs
-              </Button>
-            </Link>
+      <section className="border-t bg-secondary/30">
+        <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
+          <div className="rounded-2xl bg-primary px-8 py-16 text-center text-primary-foreground sm:px-16">
+            <h2 className="font-display text-3xl tracking-tight sm:text-4xl">
+              Talk to our security team
+            </h2>
+            <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
+              Questions about compliance, data handling, or custom security
+              requirements? Our team is ready to help.
+            </p>
+            <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+              <Link href={`mailto:${brand.support.email}`}>
+                <Button size="lg" variant="secondary" className="h-12 px-8 text-base">
+                  Contact security team
+                </Button>
+              </Link>
+              <Link href={brand.support.docs}>
+                <Button
+                  size="lg"
+                  variant="outline"
+                  className="h-12 border-primary-foreground/25 bg-transparent px-8 text-base text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                >
+                  Read security docs
+                </Button>
+              </Link>
+            </div>
           </div>
         </div>
       </section>
     </>
-  );
-}
-
-// Inline SVG icons
-
-function ShieldIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
-      <path d="m9 12 2 2 4-4" />
-    </svg>
-  );
-}
-
-function LockIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="18" height="11" x="3" y="11" rx="2" ry="2" />
-      <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-    </svg>
-  );
-}
-
-function ClipboardListIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="8" height="4" x="8" y="2" rx="1" ry="1" />
-      <path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2" />
-      <path d="M12 11h4" />
-      <path d="M12 16h4" />
-      <path d="M8 11h.01" />
-      <path d="M8 16h.01" />
-    </svg>
-  );
-}
-
-function HeartIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
-    </svg>
-  );
-}
-
-function DatabaseIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <ellipse cx="12" cy="5" rx="9" ry="3" />
-      <path d="M3 5V19A9 3 0 0 0 21 19V5" />
-      <path d="M3 12A9 3 0 0 0 21 12" />
-    </svg>
-  );
-}
-
-function ServerIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <rect width="20" height="8" x="2" y="2" rx="2" ry="2" />
-      <rect width="20" height="8" x="2" y="14" rx="2" ry="2" />
-      <line x1="6" x2="6.01" y1="6" y2="6" />
-      <line x1="6" x2="6.01" y1="18" y2="18" />
-    </svg>
-  );
-}
-
-function CheckCircleIcon({ className }: { className?: string }) {
-  return (
-    <svg
-      className={className}
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-    >
-      <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-      <path d="m9 11 3 3L22 4" />
-    </svg>
   );
 }

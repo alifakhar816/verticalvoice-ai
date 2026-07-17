@@ -35,7 +35,7 @@ export async function POST(request: NextRequest) {
     if (!parsed.success) {
       return NextResponse.json(
         {
-          error: 'Invalid input — deletion requires { tenant_id, confirm: true }',
+          error: 'Invalid input (deletion requires { tenant_id, confirm: true })',
           details: parsed.error.flatten(),
         },
         { status: 400 }

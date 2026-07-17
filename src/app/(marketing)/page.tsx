@@ -1,16 +1,12 @@
 import Link from 'next/link';
+import type { CSSProperties } from 'react';
 import { brand } from '@/config/brand';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { ComparisonDemo } from '@/components/marketing/comparison-demo';
+import { IndustryGate } from '@/components/marketing/industry-gate';
+import { LandingHero } from '@/components/marketing/landing/landing-hero';
+import { ScrollReveal } from '@/components/marketing/landing/scroll-reveal';
 
 /* ---------------------------------------------------------------------------
  * Static data
@@ -20,6 +16,7 @@ const industries = [
   {
     title: 'Healthcare',
     slug: 'healthcare',
+    accent: 'var(--vertical-healthcare)',
     description:
       'Automate appointment scheduling, reminders, and follow-ups for clinics and practices.',
     icon: HeartPulseIcon,
@@ -33,6 +30,7 @@ const industries = [
   {
     title: 'Restaurant',
     slug: 'restaurant',
+    accent: 'var(--vertical-restaurant)',
     description:
       'Handle reservations, order confirmations, and customer feedback calls effortlessly.',
     icon: UtensilsIcon,
@@ -46,6 +44,7 @@ const industries = [
   {
     title: 'Real Estate',
     slug: 'real-estate',
+    accent: 'var(--vertical-realestate)',
     description:
       'Qualify leads, schedule showings, and nurture prospects around the clock.',
     icon: BuildingIcon,
@@ -57,6 +56,8 @@ const industries = [
     ],
   },
 ];
+
+const trustPills = ['SOC 2', 'HIPAA aware', '99.9% uptime'];
 
 const steps = [
   {
@@ -70,7 +71,7 @@ const steps = [
     number: '02',
     title: 'Configure Your Agent',
     description:
-      'Answer a few questions about your business -- hours, services, common questions -- and we configure your agent automatically.',
+      'Answer a few questions about your business (hours, services, common questions) and we configure your agent automatically.',
     icon: SettingsIcon,
   },
   {
@@ -176,80 +177,42 @@ const pricingTiers = [
 export default function HomePage() {
   return (
     <>
-      {/* ================================================================== */}
-      {/* HERO                                                               */}
-      {/* ================================================================== */}
-      <section className="relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-b from-primary/5 via-transparent to-transparent" />
-        {/* Decorative blurs */}
-        <div className="pointer-events-none absolute -left-40 -top-40 h-80 w-80 rounded-full bg-primary/10 blur-3xl" />
-        <div className="pointer-events-none absolute -right-40 top-20 h-60 w-60 rounded-full bg-secondary/10 blur-3xl" />
+      {/* First-visit industry selector. Landing page only, once per visitor. */}
+      <IndustryGate />
 
-        <div className="relative mx-auto max-w-7xl px-4 py-24 sm:px-6 sm:py-32 lg:px-8 lg:py-40">
-          <div className="mx-auto max-w-3xl text-center">
-            {/* Animated green-dot badge */}
-            <div className="mb-6 inline-flex items-center gap-2 rounded-full border bg-background px-4 py-1.5 text-sm text-muted-foreground">
-              <span className="relative flex h-2 w-2">
-                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-                <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+      {/* ================================================================== */}
+      {/* 5.1 HERO                                                            */}
+      {/* ================================================================== */}
+      <LandingHero />
+
+      {/* ================================================================== */}
+      {/* 5.2 TRUST BAR                                                       */}
+      {/* ================================================================== */}
+      <section className="border-y bg-muted/30">
+        <div className="mx-auto flex max-w-7xl flex-wrap items-center justify-center gap-x-3 gap-y-2 px-4 py-5 sm:px-6 lg:px-8">
+          {trustPills.map((pill, i) => (
+            <span key={pill} className="flex items-center gap-3">
+              {i > 0 && (
+                <span aria-hidden className="text-muted-foreground/40">
+                  &middot;
+                </span>
+              )}
+              <span className="rounded-full border border-border/70 px-3 py-1 text-xs font-medium text-muted-foreground">
+                {pill}
               </span>
-              Now available for 3 industries
-            </div>
-
-            <h1 className="text-4xl font-bold tracking-tight sm:text-5xl lg:text-6xl">
-              Your Industry Already Taught{' '}
-              <span className="text-primary">the Agent</span> What Matters
-            </h1>
-
-            <p className="mt-6 text-lg leading-8 text-muted-foreground sm:text-xl">
-              {brand.copy.heroSubtitle}
-            </p>
-
-            <div className="mt-10 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
-              <Link href="/signup">
-                <Button size="lg" className="h-12 px-8 text-base">
-                  {brand.copy.ctaButton}
-                  <ArrowRightIcon className="ml-2 h-4 w-4" />
-                </Button>
-              </Link>
-              <Link href="#how-it-works">
-                <Button
-                  variant="outline"
-                  size="lg"
-                  className="h-12 px-8 text-base"
-                >
-                  See how it works
-                </Button>
-              </Link>
-            </div>
-
-            {/* Social proof row */}
-            <div className="mt-16 flex flex-wrap items-center justify-center gap-x-8 gap-y-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-2">
-                <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                No credit card required
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                Setup in under 5 minutes
-              </div>
-              <div className="flex items-center gap-2">
-                <CheckCircleIcon className="h-4 w-4 text-green-500" />
-                Cancel anytime
-              </div>
-            </div>
-          </div>
+            </span>
+          ))}
         </div>
       </section>
 
       {/* ================================================================== */}
-      {/* INDUSTRY CARDS                                                     */}
+      {/* 5.3 INDUSTRY CARDS                                                  */}
       {/* ================================================================== */}
       <section
         id="industries"
         className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8"
       >
-        <div className="mx-auto max-w-2xl text-center">
+        <ScrollReveal className="mx-auto max-w-2xl text-center">
           <Badge variant="secondary" className="mb-4">
             Pre-trained agents
           </Badge>
@@ -260,125 +223,151 @@ export default function HomePage() {
             Pre-trained AI agents that understand the language, workflows, and
             compliance requirements of your vertical.
           </p>
-        </div>
+        </ScrollReveal>
 
         <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-          {industries.map((industry) => (
-            <Card
-              key={industry.title}
-              className="relative overflow-hidden transition-shadow hover:shadow-lg"
-            >
-              <CardHeader>
-                <div className="mb-3 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <industry.icon className="h-6 w-6 text-primary" />
+          {industries.map((industry, idx) => (
+            <ScrollReveal key={industry.title} delay={idx * 80}>
+              <div
+                className="group flex h-full flex-col rounded-xl border bg-card p-6 shadow-sm transition-all duration-150 hover:-translate-y-0.5 hover:border-[var(--jewel)] hover:shadow-lg"
+                style={{ '--jewel': industry.accent } as CSSProperties}
+              >
+                <div
+                  className="mb-4 flex size-12 items-center justify-center rounded-xl"
+                  style={{
+                    color: industry.accent,
+                    backgroundColor:
+                      'color-mix(in srgb, ' +
+                      industry.accent +
+                      ' 12%, transparent)',
+                  }}
+                >
+                  <industry.icon className="size-6" />
                 </div>
-                <CardTitle className="text-lg">{industry.title}</CardTitle>
-                <CardDescription>{industry.description}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <ul className="space-y-2">
+
+                <h3 className="text-lg font-semibold text-foreground">
+                  {industry.title}
+                </h3>
+                <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                  {industry.description}
+                </p>
+
+                <ul className="mt-5 space-y-2">
                   {industry.features.map((feature) => (
                     <li
                       key={feature}
                       className="flex items-center gap-2 text-sm text-muted-foreground"
                     >
-                      <CheckCircleIcon className="h-4 w-4 shrink-0 text-green-500" />
+                      <CheckCircleIcon
+                        className="size-4 shrink-0"
+                        style={{ color: industry.accent }}
+                      />
                       {feature}
                     </li>
                   ))}
                 </ul>
-              </CardContent>
-              <CardFooter>
-                <Link
-                  href={`/industries/${industry.slug}`}
-                  className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
-                >
-                  Learn more
-                  <ArrowRightIcon className="h-3 w-3" />
-                </Link>
-              </CardFooter>
-            </Card>
+
+                <div className="mt-6 pt-2">
+                  <Link
+                    href={`/industries/${industry.slug}`}
+                    className="inline-flex items-center gap-1 text-sm font-medium hover:underline"
+                    style={{ color: industry.accent }}
+                  >
+                    Learn more
+                    <ArrowRightIcon className="size-3" />
+                  </Link>
+                </div>
+              </div>
+            </ScrollReveal>
           ))}
         </div>
       </section>
 
       {/* ================================================================== */}
-      {/* HOW IT WORKS                                                       */}
+      {/* 5.4 SAME CALLER, DIFFERENT INDUSTRY                                 */}
       {/* ================================================================== */}
-      <section id="how-it-works" className="border-y bg-muted/30">
+      <section className="border-y bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
+          <ScrollReveal className="mx-auto max-w-2xl text-center">
             <Badge variant="secondary" className="mb-4">
-              Simple setup
+              Industry-aware
             </Badge>
             <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-              Up and running in 4 steps
+              Same caller. Different industry. Perfect response.
             </h2>
             <p className="mt-4 text-lg text-muted-foreground">
-              No developers needed. No complex setup. Just answer a few
-              questions and your AI agent is live.
+              When a caller says{' '}
+              <span className="font-medium text-foreground">
+                &quot;I need to come in today&quot;
+              </span>
+              , watch how each agent responds with industry-specific
+              intelligence.
             </p>
-          </div>
+          </ScrollReveal>
 
-          <div className="relative mt-16">
-            {/* Connecting line (desktop only) */}
-            <div className="absolute left-0 right-0 top-6 hidden h-0.5 bg-border lg:block" />
+          <ScrollReveal className="mt-12" delay={80}>
+            <ComparisonDemo />
+          </ScrollReveal>
+        </div>
+      </section>
 
-            <div className="grid gap-12 lg:grid-cols-4">
-              {steps.map((item) => (
-                <div key={item.number} className="relative text-center">
-                  {/* Number circle */}
-                  <div className="relative mx-auto mb-6 flex h-12 w-12 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground shadow-md">
-                    {item.number}
+      {/* ================================================================== */}
+      {/* 5.5 HOW IT WORKS                                                    */}
+      {/* ================================================================== */}
+      <section
+        id="how-it-works"
+        className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8"
+      >
+        <ScrollReveal className="mx-auto max-w-2xl text-center">
+          <Badge variant="secondary" className="mb-4">
+            Simple setup
+          </Badge>
+          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            Up and running in 4 steps
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground">
+            No developers needed. No complex setup. Just answer a few questions
+            and your AI agent is live.
+          </p>
+        </ScrollReveal>
+
+        <div className="relative mt-16">
+          {/* Connecting brass hairline (desktop only) */}
+          <div className="absolute inset-x-0 top-6 hidden h-px bg-brand/30 lg:block" />
+
+          <div className="grid gap-12 lg:grid-cols-4">
+            {steps.map((item, idx) => (
+              <ScrollReveal key={item.number} delay={idx * 80}>
+                <div className="relative text-center">
+                  {/* Brass-ring number circle */}
+                  <div className="relative z-10 mx-auto mb-6 flex size-12 items-center justify-center rounded-full bg-card font-mono text-sm font-semibold ring-2 ring-brand">
+                    <span style={{ color: 'var(--brand)' }}>{item.number}</span>
                   </div>
 
-                  {/* Icon */}
-                  <div className="mx-auto mb-4 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                    <item.icon className="h-5 w-5 text-primary" />
+                  {/* Neutral icon tile */}
+                  <div className="mx-auto mb-4 flex size-10 items-center justify-center rounded-lg bg-secondary text-foreground">
+                    <item.icon className="size-5" />
                   </div>
 
-                  <h3 className="text-lg font-semibold">{item.title}</h3>
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {item.title}
+                  </h3>
                   <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
                     {item.description}
                   </p>
                 </div>
-              ))}
-            </div>
+              </ScrollReveal>
+            ))}
           </div>
         </div>
       </section>
 
       {/* ================================================================== */}
-      {/* INTERACTIVE COMPARISON                                             */}
-      {/* ================================================================== */}
-      <section className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-        <div className="mx-auto max-w-2xl text-center">
-          <Badge variant="secondary" className="mb-4">
-            Industry-aware
-          </Badge>
-          <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
-            Same caller. Different industry. Perfect response.
-          </h2>
-          <p className="mt-4 text-lg text-muted-foreground">
-            When a caller says{' '}
-            <span className="font-medium text-foreground">
-              &quot;I need to come in today&quot;
-            </span>
-            , watch how each agent responds with industry-specific intelligence.
-          </p>
-        </div>
-
-        <div className="mt-12">
-          <ComparisonDemo />
-        </div>
-      </section>
-
-      {/* ================================================================== */}
-      {/* SOCIAL PROOF / TESTIMONIALS                                        */}
+      {/* 5.6 TESTIMONIALS                                                    */}
       {/* ================================================================== */}
       <section className="border-y bg-muted/30">
         <div className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8">
-          <div className="mx-auto max-w-2xl text-center">
+          <ScrollReveal className="mx-auto max-w-2xl text-center">
             <Badge variant="secondary" className="mb-4">
               Trusted by businesses
             </Badge>
@@ -389,56 +378,56 @@ export default function HomePage() {
               See what our customers have to say about their experience with{' '}
               {brand.name}.
             </p>
-          </div>
+          </ScrollReveal>
 
           <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
-            {testimonials.map((t) => (
-              <Card key={t.name} className="flex flex-col">
-                <CardHeader>
-                  {/* Star rating */}
-                  <div className="mb-2 flex gap-0.5">
+            {testimonials.map((t, idx) => (
+              <ScrollReveal key={t.name} delay={idx * 80}>
+                <figure className="flex h-full flex-col rounded-xl border bg-card p-6 shadow-sm">
+                  {/* Brass 5-star row */}
+                  <div className="mb-4 flex gap-0.5">
                     {Array.from({ length: t.rating }).map((_, i) => (
                       <StarIcon
                         key={i}
-                        className="h-4 w-4 fill-amber-400 text-amber-400"
+                        className="size-4"
+                        style={{ color: 'var(--brand)', fill: 'var(--brand)' }}
                       />
                     ))}
                   </div>
-                </CardHeader>
-                <CardContent className="flex-1">
-                  <blockquote className="text-sm leading-relaxed text-muted-foreground">
+
+                  <blockquote className="flex-1 text-base leading-relaxed text-foreground">
                     &ldquo;{t.quote}&rdquo;
                   </blockquote>
-                </CardContent>
-                <CardFooter>
-                  <div className="flex items-center gap-3">
-                    {/* Avatar placeholder */}
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+
+                  <figcaption className="mt-6 flex items-center gap-3">
+                    <div className="flex size-10 items-center justify-center rounded-full bg-secondary text-sm font-semibold text-foreground">
                       {t.name
                         .split(' ')
                         .map((n) => n[0])
                         .join('')}
                     </div>
                     <div>
-                      <p className="text-sm font-medium">{t.name}</p>
+                      <p className="text-sm font-medium text-foreground">
+                        {t.name}
+                      </p>
                       <p className="text-xs text-muted-foreground">{t.role}</p>
                     </div>
-                  </div>
-                </CardFooter>
-              </Card>
+                  </figcaption>
+                </figure>
+              </ScrollReveal>
             ))}
           </div>
         </div>
       </section>
 
       {/* ================================================================== */}
-      {/* PRICING PREVIEW                                                    */}
+      {/* 5.7 PRICING PREVIEW                                                 */}
       {/* ================================================================== */}
       <section
         id="pricing"
         className="mx-auto max-w-7xl px-4 py-24 sm:px-6 lg:px-8"
       >
-        <div className="mx-auto max-w-2xl text-center">
+        <ScrollReveal className="mx-auto max-w-2xl text-center">
           <Badge variant="secondary" className="mb-4">
             Simple pricing
           </Badge>
@@ -449,105 +438,138 @@ export default function HomePage() {
             Start free, upgrade as you grow. All plans include a 14-day free
             trial.
           </p>
-        </div>
+        </ScrollReveal>
 
         <div className="mt-16 grid gap-8 lg:grid-cols-3">
-          {pricingTiers.map((tier) => (
-            <Card
-              key={tier.name}
-              className={`relative flex flex-col ${
-                tier.popular ? 'overflow-visible ring-2 ring-primary shadow-lg' : ''
-              }`}
-            >
-              {tier.popular && (
-                <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                  <Badge>Most Popular</Badge>
-                </div>
-              )}
+          {pricingTiers.map((tier, idx) => (
+            <ScrollReveal key={tier.name} delay={idx * 80} className="h-full">
+              <div
+                className={`relative flex h-full flex-col rounded-xl border bg-card p-6 shadow-sm ${
+                  tier.popular ? 'ring-2 ring-brand' : ''
+                }`}
+              >
+                {tier.popular && (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <span className="inline-flex items-center rounded-full bg-brand px-3 py-1 text-xs font-semibold text-brand-foreground shadow-sm">
+                      Most popular
+                    </span>
+                  </div>
+                )}
 
-              <CardHeader className="text-center">
-                <CardTitle className="text-lg">{tier.name}</CardTitle>
-                <CardDescription>{tier.description}</CardDescription>
-                <div className="mt-4">
-                  <span className="text-4xl font-bold">{tier.price}</span>
-                  {tier.period && (
-                    <span className="text-muted-foreground">{tier.period}</span>
-                  )}
+                <div className="text-center">
+                  <h3 className="text-lg font-semibold text-foreground">
+                    {tier.name}
+                  </h3>
+                  <p className="mt-1.5 text-sm leading-relaxed text-muted-foreground">
+                    {tier.description}
+                  </p>
+                  <div className="mt-5">
+                    <span className="text-4xl font-bold text-foreground">
+                      {tier.price}
+                    </span>
+                    {tier.period && (
+                      <span className="text-muted-foreground">
+                        {tier.period}
+                      </span>
+                    )}
+                  </div>
+                  <p className="mt-1 text-sm font-semibold text-brand">
+                    {tier.calls}
+                  </p>
                 </div>
-                <p className="mt-1 text-sm font-medium text-primary">
-                  {tier.calls}
-                </p>
-              </CardHeader>
 
-              <CardContent className="flex-1">
-                <ul className="space-y-3">
+                <ul className="mt-6 flex-1 space-y-3">
                   {tier.features.map((feature) => (
                     <li
                       key={feature}
                       className="flex items-center gap-2 text-sm text-muted-foreground"
                     >
-                      <CheckCircleIcon className="h-4 w-4 shrink-0 text-green-500" />
+                      <CheckCircleIcon className="size-4 shrink-0 text-foreground/70" />
                       {feature}
                     </li>
                   ))}
                 </ul>
-              </CardContent>
 
-              <CardFooter className="flex-col gap-2">
-                <Link href="/pricing" className="w-full">
-                  <Button
-                    variant={tier.popular ? 'default' : 'outline'}
-                    className="w-full"
-                  >
-                    {tier.cta}
-                  </Button>
-                </Link>
-              </CardFooter>
-            </Card>
+                <div className="mt-8">
+                  <Link href="/pricing" className="block">
+                    <Button
+                      variant={tier.popular ? 'default' : 'outline'}
+                      className="w-full"
+                    >
+                      {tier.cta}
+                    </Button>
+                  </Link>
+                </div>
+              </div>
+            </ScrollReveal>
           ))}
         </div>
 
         <p className="mt-8 text-center text-sm text-muted-foreground">
           All plans include a 14-day free trial.{' '}
-          <Link href="/pricing" className="text-primary hover:underline">
+          <Link href="/pricing" className="font-medium text-foreground hover:underline">
             View full pricing details
           </Link>
         </p>
       </section>
 
       {/* ================================================================== */}
-      {/* FINAL CTA                                                          */}
+      {/* 5.8 FINAL CTA                                                       */}
       {/* ================================================================== */}
       <section className="mx-auto max-w-7xl px-4 pb-24 sm:px-6 lg:px-8">
         <div className="relative overflow-hidden rounded-2xl bg-primary px-8 py-16 text-center text-primary-foreground sm:px-16">
-          {/* Decorative glows */}
-          <div className="pointer-events-none absolute -left-20 -top-20 h-60 w-60 rounded-full bg-white/5 blur-2xl" />
-          <div className="pointer-events-none absolute -bottom-20 -right-20 h-60 w-60 rounded-full bg-white/5 blur-2xl" />
+          {/* One soft brass glow */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute -right-24 -top-24 size-72 rounded-full blur-3xl"
+            style={{
+              background:
+                'radial-gradient(circle, color-mix(in srgb, var(--brand) 35%, transparent), transparent 70%)',
+            }}
+          />
+
+          {/* Faint equalizer motif in a corner (ties back to the mark) */}
+          <div
+            aria-hidden
+            className="pointer-events-none absolute bottom-6 left-8 flex items-end gap-1 opacity-15"
+          >
+            {[0.5, 0.8, 1, 0.65, 0.45].map((scale, i) => (
+              <span
+                key={i}
+                className="w-1 rounded-full bg-brand"
+                style={{
+                  height: 40,
+                  transform: `scaleY(${scale})`,
+                  transformOrigin: 'bottom',
+                }}
+              />
+            ))}
+          </div>
 
           <div className="relative">
-            <h2 className="text-3xl font-bold tracking-tight sm:text-4xl">
+            <h2 className="font-display text-4xl tracking-[-0.015em] sm:text-5xl">
               Ready to automate your calls?
             </h2>
             <p className="mx-auto mt-4 max-w-xl text-lg text-primary-foreground/80">
               Join businesses that are saving hours every week with AI-powered
               calling agents. Start your free trial today.
             </p>
-            <div className="mt-8 flex flex-col items-center gap-4 sm:flex-row sm:justify-center">
+            <div className="mt-8 flex flex-col items-center gap-3 sm:flex-row sm:justify-center">
               <Link href="/signup">
                 <Button
                   size="lg"
                   variant="secondary"
-                  className="h-12 px-8 text-base"
+                  className="group h-12 px-8 text-base"
                 >
                   {brand.copy.ctaButton}
-                  <ArrowRightIcon className="ml-2 h-4 w-4" />
+                  <ArrowRightIcon className="ml-2 size-4 transition-transform duration-150 group-hover:translate-x-[3px]" />
                 </Button>
               </Link>
               <Link href={`mailto:${brand.support.email}`}>
                 <Button
                   size="lg"
                   variant="outline"
-                  className="h-12 border-primary-foreground/20 bg-transparent px-8 text-base text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
+                  className="h-12 border-primary-foreground/25 bg-transparent px-8 text-base text-primary-foreground hover:bg-primary-foreground/10 hover:text-primary-foreground"
                 >
                   Contact sales
                 </Button>
@@ -564,10 +586,11 @@ export default function HomePage() {
  * Inline SVG icons
  * --------------------------------------------------------------------------- */
 
-function HeartPulseIcon({ className }: { className?: string }) {
+function HeartPulseIcon({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <svg
       className={className}
+      style={style}
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"
@@ -585,10 +608,11 @@ function HeartPulseIcon({ className }: { className?: string }) {
   );
 }
 
-function UtensilsIcon({ className }: { className?: string }) {
+function UtensilsIcon({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <svg
       className={className}
+      style={style}
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"
@@ -607,10 +631,11 @@ function UtensilsIcon({ className }: { className?: string }) {
   );
 }
 
-function BuildingIcon({ className }: { className?: string }) {
+function BuildingIcon({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <svg
       className={className}
+      style={style}
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"
@@ -637,10 +662,11 @@ function BuildingIcon({ className }: { className?: string }) {
   );
 }
 
-function CheckCircleIcon({ className }: { className?: string }) {
+function CheckCircleIcon({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <svg
       className={className}
+      style={style}
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"
@@ -679,15 +705,16 @@ function ArrowRightIcon({ className }: { className?: string }) {
   );
 }
 
-function StarIcon({ className }: { className?: string }) {
+function StarIcon({ className, style }: { className?: string; style?: CSSProperties }) {
   return (
     <svg
       className={className}
+      style={style}
       xmlns="http://www.w3.org/2000/svg"
       width="24"
       height="24"
       viewBox="0 0 24 24"
-      fill="none"
+      fill="currentColor"
       stroke="currentColor"
       strokeWidth="2"
       strokeLinecap="round"

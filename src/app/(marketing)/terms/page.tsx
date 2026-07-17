@@ -1,5 +1,4 @@
 import type { Metadata } from 'next';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 export const metadata: Metadata = {
   title: 'Terms of Service | VerticalVoice AI',
@@ -25,7 +24,7 @@ const sections = [
   },
   {
     title: 'Industry-specific restrictions',
-    body: 'The healthcare configuration is an administrative assistant only — it must not be used to provide diagnosis, medication dosing, or clinical advice, and must not process real protected health information (PHI) in the current deployment. The real-estate configuration must not be used in a manner that violates fair-housing law.',
+    body: 'The healthcare configuration is an administrative assistant only. It must not be used to provide diagnosis, medication dosing, or clinical advice, and must not process real protected health information (PHI) in the current deployment. The real-estate configuration must not be used in a manner that violates fair-housing law.',
   },
   {
     title: 'Service availability',
@@ -35,30 +34,53 @@ const sections = [
     title: 'Limitation of liability',
     body: 'To the maximum extent permitted by law, VerticalVoice AI is not liable for indirect, incidental, or consequential damages arising from use of the platform. This section is a placeholder pending legal review and is not a substitute for a properly drafted limitation-of-liability clause.',
   },
-  {
-    title: 'Contact',
-    body: 'Questions about these terms can be sent to support@verticalvoice.ai.',
-  },
 ];
 
 export default function TermsPage() {
   return (
-    <div className="mx-auto max-w-3xl px-6 py-16">
-      <h1 className="text-3xl font-bold tracking-tight">Terms of Service</h1>
-      <p className="mt-2 text-sm text-muted-foreground">
-        Last updated: {new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
+    <div className="mx-auto max-w-[68ch] px-6 py-20">
+      <p className="font-mono text-xs uppercase tracking-wide text-muted-foreground">
+        Legal
       </p>
-      <div className="mt-10 space-y-6">
+      <h1 className="mt-3 font-display text-4xl tracking-tight">
+        Terms of Service
+      </h1>
+      <p className="mt-3 text-sm text-muted-foreground">
+        Last updated{' '}
+        {new Date().toLocaleDateString('en-US', {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric',
+        })}
+      </p>
+
+      <div className="mt-12 space-y-10">
         {sections.map((section) => (
-          <Card key={section.title}>
-            <CardHeader>
-              <CardTitle className="text-lg">{section.title}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm leading-relaxed text-muted-foreground">{section.body}</p>
-            </CardContent>
-          </Card>
+          <section key={section.title}>
+            <h2 className="text-xl font-semibold tracking-tight text-foreground">
+              {section.title}
+            </h2>
+            <p className="mt-3 text-base leading-7 text-muted-foreground">
+              {section.body}
+            </p>
+          </section>
         ))}
+
+        <section>
+          <h2 className="text-xl font-semibold tracking-tight text-foreground">
+            Contact
+          </h2>
+          <p className="mt-3 text-base leading-7 text-muted-foreground">
+            Questions about these terms can be sent to{' '}
+            <a
+              href="mailto:support@verticalvoice.ai"
+              className="text-brand hover:underline"
+            >
+              support@verticalvoice.ai
+            </a>
+            .
+          </p>
+        </section>
       </div>
     </div>
   );

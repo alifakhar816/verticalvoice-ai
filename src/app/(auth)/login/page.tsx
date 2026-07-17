@@ -7,17 +7,13 @@ import { createClient } from '@/lib/database/supabase-client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardFooter,
-  CardHeader,
-  CardTitle,
-} from '@/components/ui/card';
 import { toast } from 'sonner';
+import { AuthSplitShell } from '@/components/auth/auth-split-shell';
+import { GoogleButton, OrDivider, PasswordField } from '@/components/auth/auth-ui';
 
 type AuthMode = 'password' | 'magic-link';
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -26,8 +22,17 @@ export default function LoginPage() {
   const [mode, setMode] = useState<AuthMode>('password');
   const [loading, setLoading] = useState(false);
   const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [emailError, setEmailError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const supabase = createClient();
+
+  function validateEmail() {
+    if (!email) return setEmailError('Email is required'), false;
+    if (!EMAIL_RE.test(email)) return setEmailError('Enter a valid email address'), false;
+    setEmailError('');
+    return true;
+  }
 
   async function handlePasswordLogin(e: React.FormEvent) {
     e.preventDefault();
@@ -71,22 +76,36 @@ export default function LoginPage() {
     toast.success('Magic link sent! Check your email.');
   }
 
+  async function handleGoogle() {
+    setLoading(true);
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo: `${window.location.origin}/callback`,
+      },
+    });
+
+    if (error) {
+      toast.error(error.message);
+      setLoading(false);
+    }
+  }
+
   if (magicLinkSent) {
     return (
-      <Card>
-        <CardHeader className="text-center">
-          <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
-            <MailIcon className="h-6 w-6 text-primary" />
+      <AuthSplitShell>
+        <div className="text-center">
+          <div className="mx-auto mb-5 flex size-12 items-center justify-center rounded-full bg-brand/10 text-brand">
+            <MailIcon className="size-6" />
           </div>
-          <CardTitle className="text-xl">Check your email</CardTitle>
-          <CardDescription>
-            We sent a magic link to <strong>{email}</strong>. Click the link in
-            the email to sign in.
-          </CardDescription>
-        </CardHeader>
-        <CardFooter className="justify-center">
+          <h1 className="text-2xl font-semibold tracking-tight">Check your email</h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            We sent a magic link to <strong className="text-foreground">{email}</strong>.
+            Click the link in the email to sign in.
+          </p>
           <Button
             variant="ghost"
+            className="mt-6 h-11"
             onClick={() => {
               setMagicLinkSent(false);
               setMode('password');
@@ -94,71 +113,112 @@ export default function LoginPage() {
           >
             Back to sign in
           </Button>
-        </CardFooter>
-      </Card>
+        </div>
+      </AuthSplitShell>
     );
   }
 
   return (
-    <Card>
-      <CardHeader className="text-center">
-        <CardTitle className="text-xl">Welcome back</CardTitle>
-        <CardDescription>Sign in to your account to continue</CardDescription>
-      </CardHeader>
-      <CardContent className="space-y-4">
+    <AuthSplitShell>
+      <div>
+        <header className="mb-8">
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome back</h1>
+          <p className="mt-1.5 text-sm text-muted-foreground">
+            Sign in to your account to continue.
+          </p>
+        </header>
+
+        <GoogleButton onClick={handleGoogle} loading={loading} />
+
+        <div className="my-6">
+          <OrDivider />
+        </div>
+
         {mode === 'password' ? (
-          <form onSubmit={handlePasswordLogin} className="space-y-4">
+          <form onSubmit={handlePasswordLogin} className="space-y-5" noValidate>
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
                 id="email"
                 type="email"
+                inputMode="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={validateEmail}
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? 'email-error' : undefined}
                 required
                 autoComplete="email"
               />
+              {emailError ? (
+                <p id="email-error" className="text-xs text-destructive">
+                  {emailError}
+                </p>
+              ) : null}
             </div>
+
             <div className="space-y-2">
               <div className="flex items-center justify-between">
                 <Label htmlFor="password">Password</Label>
                 <Link
                   href="/forgot-password"
-                  className="text-xs text-primary hover:underline"
+                  className="text-xs font-medium text-muted-foreground transition-colors hover:text-brand"
                 >
                   Forgot password?
                 </Link>
               </div>
-              <Input
+              <PasswordField
                 id="password"
-                type="password"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                onBlur={() =>
+                  setPasswordError(password ? '' : 'Password is required')
+                }
+                aria-invalid={!!passwordError}
+                aria-describedby={passwordError ? 'password-error' : undefined}
                 required
                 autoComplete="current-password"
               />
+              {passwordError ? (
+                <p id="password-error" className="text-xs text-destructive">
+                  {passwordError}
+                </p>
+              ) : null}
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+
+            <Button type="submit" className="h-11 w-full" disabled={loading}>
               {loading ? 'Signing in...' : 'Sign in'}
             </Button>
           </form>
         ) : (
-          <form onSubmit={handleMagicLink} className="space-y-4">
+          <form onSubmit={handleMagicLink} className="space-y-5" noValidate>
             <div className="space-y-2">
               <Label htmlFor="magic-email">Email</Label>
               <Input
                 id="magic-email"
                 type="email"
+                inputMode="email"
                 placeholder="you@example.com"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                onBlur={validateEmail}
+                aria-invalid={!!emailError}
+                aria-describedby={emailError ? 'magic-email-error' : undefined}
                 required
                 autoComplete="email"
               />
+              {emailError ? (
+                <p id="magic-email-error" className="text-xs text-destructive">
+                  {emailError}
+                </p>
+              ) : null}
+              <p className="text-xs text-muted-foreground">
+                We&apos;ll email you a one-time sign-in link.
+              </p>
             </div>
-            <Button type="submit" className="w-full" disabled={loading}>
+            <Button type="submit" className="h-11 w-full" disabled={loading}>
               {loading ? 'Sending...' : 'Send magic link'}
             </Button>
           </form>
@@ -166,23 +226,27 @@ export default function LoginPage() {
 
         <button
           type="button"
-          onClick={() => setMode(mode === 'password' ? 'magic-link' : 'password')}
-          className="w-full text-center text-xs text-muted-foreground hover:text-foreground transition-colors"
+          onClick={() =>
+            setMode(mode === 'password' ? 'magic-link' : 'password')
+          }
+          className="mt-4 w-full text-center text-xs font-medium text-muted-foreground transition-colors hover:text-brand"
         >
           {mode === 'password'
-            ? 'Sign in with magic link instead'
+            ? 'Email me a magic link instead'
             : 'Sign in with password instead'}
         </button>
-      </CardContent>
-      <CardFooter className="justify-center">
-        <p className="text-sm text-muted-foreground">
-          Don&apos;t have an account?{' '}
-          <Link href="/signup" className="font-medium text-primary hover:underline">
-            Sign up
+
+        <p className="mt-8 text-center text-sm text-muted-foreground">
+          New here?{' '}
+          <Link
+            href="/signup"
+            className="font-medium text-foreground transition-colors hover:text-brand"
+          >
+            Start free trial
           </Link>
         </p>
-      </CardFooter>
-    </Card>
+      </div>
+    </AuthSplitShell>
   );
 }
 
@@ -191,8 +255,6 @@ function MailIcon({ className }: { className?: string }) {
     <svg
       className={className}
       xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
       viewBox="0 0 24 24"
       fill="none"
       stroke="currentColor"

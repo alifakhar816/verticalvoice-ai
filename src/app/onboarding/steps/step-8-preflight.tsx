@@ -16,6 +16,7 @@ import {
   Loader2,
   ShieldCheck,
 } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import type { StepProps } from '../types';
 
 type PreflightResult = {
@@ -148,12 +149,15 @@ export function Step8Preflight({ data, updateData }: StepProps) {
   const passedCount = results.filter((r) => r.passed).length;
   const failedCount = results.filter((r) => !r.passed).length;
 
+  // Labels for the animated "checking" spinner rows while a run is in flight.
+  const pendingChecks = runPreflightChecks(data).map((r) => r.check);
+
   return (
     <div className="space-y-6">
       <Card>
         <CardHeader className="text-center">
           <div className="mx-auto mb-2 flex size-16 items-center justify-center rounded-full bg-muted">
-            <ShieldCheck className="size-8 text-primary" />
+            <ShieldCheck className="size-8 text-brand" />
           </div>
           <CardTitle>Preflight Check</CardTitle>
           <CardDescription>
@@ -176,10 +180,28 @@ export function Step8Preflight({ data, updateData }: StepProps) {
         </CardContent>
       </Card>
 
-      {hasResults && (
+      {/* Running: staggered spinner rows resolving one by one */}
+      {running && (
+        <div className="space-y-2">
+          {pendingChecks.map((label, i) => (
+            <div
+              key={label}
+              className="animate-vv-fade-up flex items-center gap-3 rounded-lg border bg-muted/30 p-3"
+              style={{ animationDelay: `${i * 60}ms` }}
+            >
+              <Loader2 className="size-5 shrink-0 animate-spin text-muted-foreground" />
+              <p className="text-sm font-medium text-muted-foreground">
+                {label}
+              </p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {!running && hasResults && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <Badge variant={failedCount === 0 ? 'default' : 'destructive'}>
+            <Badge variant={failedCount === 0 ? 'success' : 'destructive'}>
               {passedCount}/{results.length} passed
             </Badge>
             {failedCount > 0 && (
@@ -192,17 +214,19 @@ export function Step8Preflight({ data, updateData }: StepProps) {
           <div className="space-y-2">
             {results.map((result, i) => (
               <div
-                key={i}
-                className={`flex items-start gap-3 rounded-lg border p-3 ${
+                key={result.check}
+                className={cn(
+                  'animate-vv-fade-up flex items-start gap-3 rounded-lg border p-3',
                   result.passed
-                    ? 'border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/30'
-                    : 'border-red-200 bg-red-50 dark:border-red-900 dark:bg-red-950/30'
-                }`}
+                    ? 'border-success/30 bg-success/10'
+                    : 'border-destructive/30 bg-destructive/10'
+                )}
+                style={{ animationDelay: `${i * 70}ms` }}
               >
                 {result.passed ? (
-                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-green-600 dark:text-green-400" />
+                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />
                 ) : (
-                  <XCircle className="mt-0.5 size-5 shrink-0 text-red-600 dark:text-red-400" />
+                  <XCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
                 )}
                 <div>
                   <p className="text-sm font-medium">{result.check}</p>

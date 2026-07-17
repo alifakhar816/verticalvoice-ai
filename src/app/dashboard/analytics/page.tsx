@@ -23,16 +23,18 @@ import {
 } from "lucide-react";
 import { createServerClient } from "@/lib/database/supabase-server";
 import { getCurrentTenantId } from "@/domain/tenants/current";
+import { VolumeChart, IntentChart, CostDonut } from "./analytics-charts";
 
 // NOTE: caller-intent classification isn't stored on the `calls` table today,
 // so this breakdown is illustrative sample data (clearly labeled below) and
-// not derived from real tenant data like the rest of this page.
+// not derived from real tenant data like the rest of this page. Series colors
+// come from the brass-led monochrome chart palette in the client chart.
 const intentDistribution = [
-  { intent: "Appointment Scheduling", percentage: 45, color: "bg-primary" },
-  { intent: "General Inquiry", percentage: 25, color: "bg-blue-500" },
-  { intent: "Prescription Refill", percentage: 15, color: "bg-emerald-500" },
-  { intent: "Insurance Question", percentage: 10, color: "bg-amber-500" },
-  { intent: "Emergency Triage", percentage: 5, color: "bg-red-500" },
+  { intent: "Appointment Scheduling", percentage: 45 },
+  { intent: "General Inquiry", percentage: 25 },
+  { intent: "Prescription Refill", percentage: 15 },
+  { intent: "Insurance Question", percentage: 10 },
+  { intent: "Emergency Triage", percentage: 5 },
 ];
 
 const topIntents = [
@@ -251,7 +253,6 @@ export default async function AnalyticsPage({
   const totalCost = costRows.reduce((sum, c) => sum + c.total_cost, 0);
 
   const chartData = period === "today" ? buildHourBlockBuckets(calls) : buildDailyBuckets(range, calls);
-  const maxCalls = Math.max(1, ...chartData.map((d) => d.calls));
 
   const chartDescription =
     period === "today"
@@ -341,21 +342,7 @@ export default async function AnalyticsPage({
               No calls recorded in this period.
             </p>
           ) : (
-            <div className="flex items-end justify-between gap-2" style={{ height: 200 }}>
-              {chartData.map((d, i) => {
-                const heightPercent = (d.calls / maxCalls) * 100;
-                return (
-                  <div key={`${d.label}-${i}`} className="flex flex-1 flex-col items-center gap-1">
-                    <span className="text-xs font-medium text-muted-foreground">{d.calls}</span>
-                    <div
-                      className="w-full max-w-12 rounded-t-md bg-primary transition-all"
-                      style={{ height: `${heightPercent}%` }}
-                    />
-                    <span className="text-xs text-muted-foreground">{d.label}</span>
-                  </div>
-                );
-              })}
-            </div>
+            <VolumeChart data={chartData} summary={`${chartDescription}: ${chartData.map((d) => `${d.label} ${d.calls}`).join(", ")}.`} />
           )}
         </CardContent>
       </Card>
@@ -369,24 +356,11 @@ export default async function AnalyticsPage({
           </CardTitle>
           <CardDescription>
             Breakdown of caller intents{" "}
-            <span className="text-xs">(sample data — intent tracking not yet available)</span>
+            <span className="text-xs">(sample data, intent tracking not yet available)</span>
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {intentDistribution.map((item) => (
-            <div key={item.intent} className="space-y-1">
-              <div className="flex items-center justify-between text-sm">
-                <span>{item.intent}</span>
-                <span className="font-medium">{item.percentage}%</span>
-              </div>
-              <div className="h-3 w-full overflow-hidden rounded-full bg-muted">
-                <div
-                  className={`h-full rounded-full ${item.color} transition-all`}
-                  style={{ width: `${item.percentage}%` }}
-                />
-              </div>
-            </div>
-          ))}
+        <CardContent>
+          <IntentChart data={intentDistribution} />
         </CardContent>
       </Card>
 
@@ -395,15 +369,15 @@ export default async function AnalyticsPage({
         <Card>
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="text-sm font-medium">Resolution Rate</CardTitle>
-            <TrendingUp className="size-4 text-green-500" />
+            <TrendingUp className="size-4 text-success" />
           </CardHeader>
           <CardContent>
             <div className="flex items-center gap-2">
-              <span className="text-2xl font-bold">{Math.round(resolutionRate)}%</span>
+              <span className="font-mono text-2xl font-bold tabular-nums">{Math.round(resolutionRate)}%</span>
               {resolutionDelta !== null && (
                 <span
-                  className={`flex items-center text-xs ${
-                    resolutionDelta >= 0 ? "text-green-600" : "text-red-600"
+                  className={`flex items-center text-xs font-mono tabular-nums ${
+                    resolutionDelta >= 0 ? "text-success" : "text-destructive"
                   }`}
                 >
                   {resolutionDelta >= 0 ? (
@@ -428,7 +402,7 @@ export default async function AnalyticsPage({
             <Clock className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{formatDuration(avgDurationSeconds)}</div>
+            <div className="font-mono text-2xl font-bold tabular-nums">{formatDuration(avgDurationSeconds)}</div>
             <p className="mt-1 text-xs text-muted-foreground">
               Minutes per call
             </p>
@@ -441,7 +415,7 @@ export default async function AnalyticsPage({
             <Phone className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{totalCalls}</div>
+            <div className="font-mono text-2xl font-bold tabular-nums">{totalCalls}</div>
             <p className="mt-1 text-xs text-muted-foreground">
               This period
             </p>
@@ -454,7 +428,7 @@ export default async function AnalyticsPage({
             <DollarSign className="size-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">${totalCost.toFixed(2)}</div>
+            <div className="font-mono text-2xl font-bold tabular-nums">${totalCost.toFixed(2)}</div>
             <p className="mt-1 text-xs text-muted-foreground">
               All services combined
             </p>
@@ -488,8 +462,8 @@ export default async function AnalyticsPage({
                   {topIntents.map((row) => (
                     <tr key={row.intent} className="border-b last:border-0">
                       <td className="py-2 font-medium">{row.intent}</td>
-                      <td className="py-2">{row.count}</td>
-                      <td className="py-2">{row.avgDuration}</td>
+                      <td className="py-2 font-mono tabular-nums">{row.count}</td>
+                      <td className="py-2 font-mono tabular-nums">{row.avgDuration}</td>
                       <td className="py-2">
                         <Badge variant="outline">{row.resolution}</Badge>
                       </td>
@@ -517,20 +491,31 @@ export default async function AnalyticsPage({
               </p>
             ) : (
               <>
+                <CostDonut
+                  telephony={telephonyCost}
+                  aiProcessing={aiProcessingCost}
+                  total={totalCost}
+                />
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Telephony</span>
-                  <span className="text-sm font-medium">${telephonyCost.toFixed(2)}</span>
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span aria-hidden className="inline-block size-2.5 rounded-sm bg-[var(--chart-1)]" />
+                    Telephony
+                  </span>
+                  <span className="font-mono text-sm font-medium tabular-nums">${telephonyCost.toFixed(2)}</span>
                 </div>
                 <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">AI Processing</span>
-                  <span className="text-sm font-medium">${aiProcessingCost.toFixed(2)}</span>
+                  <span className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <span aria-hidden className="inline-block size-2.5 rounded-sm bg-[var(--chart-3)]" />
+                    AI Processing
+                  </span>
+                  <span className="font-mono text-sm font-medium tabular-nums">${aiProcessingCost.toFixed(2)}</span>
                 </div>
               </>
             )}
             <Separator />
             <div className="flex items-center justify-between">
               <span className="font-medium">Total</span>
-              <span className="text-lg font-bold">${totalCost.toFixed(2)}</span>
+              <span className="font-mono text-lg font-bold tabular-nums">${totalCost.toFixed(2)}</span>
             </div>
           </CardContent>
         </Card>
@@ -593,24 +578,25 @@ export default async function AnalyticsPage({
             <div className="grid grid-cols-2 gap-4">
               <div className="rounded-lg border bg-muted/50 p-4">
                 <p className="text-xs text-muted-foreground">AI Cost</p>
-                <p className="text-xl font-bold">${totalCost.toFixed(2)}</p>
+                <p className="font-mono text-xl font-bold tabular-nums">${totalCost.toFixed(2)}</p>
               </div>
               <div className="rounded-lg border bg-muted/50 p-4">
                 <p className="text-xs text-muted-foreground">Traditional Cost</p>
-                <p className="text-xl font-bold">
+                <p className="font-mono text-xl font-bold tabular-nums">
                   ${traditionalCost.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="rounded-lg border border-green-200 bg-green-50 p-4 dark:border-green-800 dark:bg-green-950">
-                <p className="text-xs text-green-600 dark:text-green-400">Savings</p>
-                <p className="text-xl font-bold text-green-700 dark:text-green-300">
+              <div className="rounded-lg border border-success/30 bg-success/5 p-4">
+                <p className="text-xs text-success">Savings</p>
+                <p className="font-mono text-xl font-bold tabular-nums text-success">
                   ${savings.toLocaleString("en-US", { minimumFractionDigits: 2 })}
                 </p>
               </div>
-              <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
-                <p className="text-xs text-primary">ROI</p>
-                <p className="text-xl font-bold text-primary">
-                  {roi}%
+              <div className="flex flex-col justify-center rounded-lg border border-brand/30 bg-accent/40 p-4">
+                <p className="text-xs font-medium uppercase tracking-wide text-accent-foreground">ROI</p>
+                <p className="font-display text-brand text-5xl leading-none">
+                  {roi}
+                  <span className="text-3xl">%</span>
                 </p>
               </div>
             </div>

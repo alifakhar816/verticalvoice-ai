@@ -58,6 +58,26 @@ export default async function CallsPage({
   // both pages agree on the wall-clock time shown for the same `started_at`.
   const tenantTimezone = businessProfile?.timezone || "UTC";
 
+  // Additive, tenant-scoped lookup of the evaluation score for the calls on
+  // this page only, so the table can show a real (not fabricated) score
+  // column. Keyed by call_id; calls without an evaluation stay null.
+  const callIds = calls.map((c) => c.id);
+  const scoreByCallId = new Map<string, number>();
+  if (callIds.length > 0) {
+    const { data: evaluations } = await supabase
+      .from("call_evaluations")
+      .select("call_id, score, max_score")
+      .eq("tenant_id", tenantId)
+      .in("call_id", callIds);
+    for (const row of evaluations ?? []) {
+      const max = typeof row.max_score === "number" && row.max_score > 0 ? row.max_score : 100;
+      const normalized = Math.max(0, Math.min(100, (row.score / max) * 100));
+      // Keep the highest score if a call somehow has multiple evaluations.
+      const prev = scoreByCallId.get(row.call_id);
+      if (prev == null || normalized > prev) scoreByCallId.set(row.call_id, normalized);
+    }
+  }
+
   const rows: CallRow[] = calls.map((call) => ({
     id: call.id,
     startedAt: call.started_at,
@@ -65,6 +85,7 @@ export default async function CallsPage({
     durationSeconds: call.duration_seconds,
     status: call.status,
     direction: call.direction,
+    score: scoreByCallId.get(call.id) ?? null,
   }));
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));

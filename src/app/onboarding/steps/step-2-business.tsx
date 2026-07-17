@@ -74,7 +74,7 @@ export function Step2Business({ data, updateData }: StepProps) {
   return (
     <div className="space-y-8">
       <section className="space-y-4">
-        <h3 className="text-base font-semibold">Business Information</h3>
+        <h3 className="font-mono text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Business Information</h3>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="businessName">
@@ -192,7 +192,7 @@ export function Step2Business({ data, updateData }: StepProps) {
       <Separator />
 
       <section className="space-y-4">
-        <h3 className="text-base font-semibold">Contact Information</h3>
+        <h3 className="font-mono text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Contact Information</h3>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label htmlFor="contactName">
@@ -227,7 +227,7 @@ export function Step2Business({ data, updateData }: StepProps) {
       <Separator />
 
       <section className="space-y-4">
-        <h3 className="text-base font-semibold">Language Preferences</h3>
+        <h3 className="font-mono text-xs font-medium uppercase tracking-[0.14em] text-muted-foreground">Language Preferences</h3>
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <Label>Primary Language</Label>

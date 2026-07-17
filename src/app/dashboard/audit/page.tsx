@@ -1,25 +1,14 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { Fragment, useEffect, useMemo, useState } from "react";
 import {
   Card,
   CardContent,
-  CardHeader,
-  CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Activity,
-  Bot,
-  Building2,
-  ChevronDown,
-  ChevronRight,
-  Phone,
-  Wrench,
-  type LucideIcon,
-} from "lucide-react";
+import { Search, ChevronDown, ChevronRight } from "lucide-react";
 
 interface AuditEvent {
   id: string;
@@ -34,17 +23,6 @@ interface AuditEvent {
 }
 
 const PAGE_SIZE = 15;
-
-const resourceIcons: Record<string, LucideIcon> = {
-  tenant: Building2,
-  agent: Bot,
-  call: Phone,
-  call_tool_run: Wrench,
-};
-
-function iconFor(resourceType: string): LucideIcon {
-  return resourceIcons[resourceType] ?? Activity;
-}
 
 function humanizeAction(action: string): string {
   return action
@@ -62,7 +40,7 @@ function capitalize(value: string): string {
 function formatEventTime(iso: string): string {
   const date = new Date(iso);
   const now = new Date();
-  const time = date.toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
+  const time = date.toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit", hour12: false });
 
   if (date.toDateString() === now.toDateString()) {
     return `Today ${time}`;
@@ -74,10 +52,10 @@ function formatEventTime(iso: string): string {
   }
   return date.toLocaleString(undefined, {
     month: "short",
-    day: "numeric",
-    year: "numeric",
-    hour: "numeric",
+    day: "2-digit",
+    hour: "2-digit",
     minute: "2-digit",
+    hour12: false,
   });
 }
 
@@ -163,8 +141,12 @@ export default function AuditPage() {
 
   const dateRangeLabel =
     events.length > 0
-      ? `${formatShortDate(events[events.length - 1].createdAt)} – ${formatShortDate(events[0].createdAt)}`
+      ? `${formatShortDate(events[events.length - 1].createdAt)} to ${formatShortDate(events[0].createdAt)}`
       : null;
+
+  function toggleExpand(id: string) {
+    setExpandedId((prev) => (prev === id ? null : id));
+  }
 
   return (
     <div className="space-y-6">
@@ -175,13 +157,17 @@ export default function AuditPage() {
         </p>
       </div>
 
+      {/* Filter bar */}
       <div className="flex flex-wrap items-center gap-3">
-        <Input
-          placeholder="Search events..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="max-w-sm"
-        />
+        <div className="relative max-w-sm flex-1">
+          <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+          <Input
+            placeholder="Search events..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="pl-9"
+          />
+        </div>
         <div className="flex flex-wrap gap-1.5">
           <Button
             variant={filterType === "All" ? "default" : "outline"}
@@ -202,130 +188,139 @@ export default function AuditPage() {
           ))}
         </div>
         {dateRangeLabel && (
-          <span className="ml-auto text-sm text-muted-foreground">{dateRangeLabel}</span>
+          <span className="ml-auto font-mono text-xs tabular-nums text-muted-foreground">{dateRangeLabel}</span>
         )}
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle>Events</CardTitle>
-        </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {loading ? (
-            <p className="py-6 text-sm text-muted-foreground">Loading audit events…</p>
+            <p className="p-6 text-sm text-muted-foreground">Loading audit events…</p>
           ) : loadError ? (
-            <p className="py-6 text-sm text-destructive">{loadError}</p>
+            <p className="p-6 text-sm text-destructive">{loadError}</p>
           ) : filteredEvents.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">
+            <p className="p-6 text-sm text-muted-foreground">
               {events.length === 0
                 ? "No audit events recorded for this workspace yet."
                 : "No events match your search or filter."}
             </p>
           ) : (
-            <div className="divide-y">
-              {pagedEvents.map((event) => {
-                const Icon = iconFor(event.resourceType);
-                const isExpanded = expandedId === event.id;
-                const actorLabel = event.actorName || event.actorEmail || "System";
-
-                return (
-                  <div key={event.id}>
-                    <button
-                      type="button"
-                      className="flex w-full items-center gap-4 py-3 text-left transition-colors hover:bg-muted/50"
-                      onClick={() => setExpandedId(isExpanded ? null : event.id)}
-                    >
-                      <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-muted">
-                        <Icon className="size-4 text-muted-foreground" />
-                      </div>
-
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-sm font-medium">
-                          {humanizeAction(event.action)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">{actorLabel}</p>
-                      </div>
-
-                      <Badge variant="outline">{capitalize(event.resourceType.replace(/_/g, " "))}</Badge>
-
-                      <span className="shrink-0 text-xs text-muted-foreground">
-                        {formatEventTime(event.createdAt)}
-                      </span>
-
-                      {isExpanded ? (
-                        <ChevronDown className="size-4 shrink-0 text-muted-foreground" />
-                      ) : (
-                        <ChevronRight className="size-4 shrink-0 text-muted-foreground" />
-                      )}
-                    </button>
-
-                    {isExpanded && (
-                      <div className="mb-3 ml-12 rounded-lg border bg-muted/30 p-4">
-                        <div className="grid gap-2 text-sm">
-                          <div className="flex gap-2">
-                            <span className="font-medium text-muted-foreground">
-                              Event Type:
-                            </span>
-                            <span>{capitalize(event.resourceType.replace(/_/g, " "))}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <span className="font-medium text-muted-foreground">
-                              Action:
-                            </span>
-                            <span className="font-mono text-xs">{event.action}</span>
-                          </div>
-                          <div className="flex gap-2">
-                            <span className="font-medium text-muted-foreground">
-                              Actor:
-                            </span>
-                            <span>
-                              {event.actorName || event.actorEmail
-                                ? `${event.actorName ?? ""}${
-                                    event.actorEmail ? ` (${event.actorEmail})` : ""
-                                  }`.trim()
-                                : "System"}
-                            </span>
-                          </div>
-                          {event.resourceId && (
-                            <div className="flex gap-2">
-                              <span className="font-medium text-muted-foreground">
-                                Resource ID:
-                              </span>
-                              <span className="font-mono text-xs">{event.resourceId}</span>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left">
+                    <th className="px-4 py-2.5 font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Time
+                    </th>
+                    <th className="px-4 py-2.5 font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Actor
+                    </th>
+                    <th className="px-4 py-2.5 font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Action
+                    </th>
+                    <th className="px-4 py-2.5 font-mono text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Target
+                    </th>
+                    <th className="w-8 px-4 py-2.5" aria-label="Expand" />
+                  </tr>
+                </thead>
+                <tbody className="divide-y">
+                  {pagedEvents.map((event) => {
+                    const isExpanded = expandedId === event.id;
+                    const actorLabel = event.actorName || event.actorEmail || "System";
+                    return (
+                      <Fragment key={event.id}>
+                        <tr
+                          role="button"
+                          tabIndex={0}
+                          aria-expanded={isExpanded}
+                          className="cursor-pointer align-top transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          onClick={() => toggleExpand(event.id)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" || e.key === " ") {
+                              e.preventDefault();
+                              toggleExpand(event.id);
+                            }
+                          }}
+                        >
+                          <td className="whitespace-nowrap px-4 py-2.5 font-mono text-xs tabular-nums text-muted-foreground">
+                            {formatEventTime(event.createdAt)}
+                          </td>
+                          <td className="px-4 py-2.5">{actorLabel}</td>
+                          <td className="px-4 py-2.5 font-medium">
+                            {humanizeAction(event.action)}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="flex flex-col gap-1">
+                              <Badge variant="outline" className="w-fit">
+                                {capitalize(event.resourceType.replace(/_/g, " "))}
+                              </Badge>
+                              {event.resourceId && (
+                                <span className="font-mono text-xs text-muted-foreground">
+                                  {event.resourceId}
+                                </span>
+                              )}
                             </div>
-                          )}
-                          <div className="flex gap-2">
-                            <span className="font-medium text-muted-foreground">
-                              Timestamp:
-                            </span>
-                            <span>{formatFullTimestamp(event.createdAt)}</span>
-                          </div>
-                          {event.metadata != null && (
-                            <div className="flex gap-2">
-                              <span className="font-medium text-muted-foreground">
-                                Details:
-                              </span>
-                              <code className="whitespace-pre-wrap text-xs">
-                                {JSON.stringify(event.metadata, null, 2)}
-                              </code>
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+                          </td>
+                          <td className="px-4 py-2.5 text-muted-foreground">
+                            {isExpanded ? (
+                              <ChevronDown className="size-4" />
+                            ) : (
+                              <ChevronRight className="size-4" />
+                            )}
+                          </td>
+                        </tr>
+                        {isExpanded && (
+                          <tr className="bg-muted/30">
+                            <td colSpan={5} className="px-4 py-3">
+                              <div className="grid gap-2 text-sm">
+                                <div className="flex gap-2">
+                                  <span className="font-medium text-muted-foreground">Action:</span>
+                                  <span className="font-mono text-xs">{event.action}</span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="font-medium text-muted-foreground">Actor:</span>
+                                  <span>
+                                    {event.actorName || event.actorEmail
+                                      ? `${event.actorName ?? ""}${
+                                          event.actorEmail ? ` (${event.actorEmail})` : ""
+                                        }`.trim()
+                                      : "System"}
+                                  </span>
+                                </div>
+                                <div className="flex gap-2">
+                                  <span className="font-medium text-muted-foreground">Timestamp:</span>
+                                  <span className="font-mono text-xs tabular-nums">
+                                    {formatFullTimestamp(event.createdAt)}
+                                  </span>
+                                </div>
+                                {event.metadata != null && (
+                                  <div className="flex gap-2">
+                                    <span className="font-medium text-muted-foreground">Details:</span>
+                                    <code className="whitespace-pre-wrap font-mono text-xs">
+                                      {JSON.stringify(event.metadata, null, 2)}
+                                    </code>
+                                  </div>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        )}
+                      </Fragment>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           )}
         </CardContent>
       </Card>
 
       <div className="flex items-center justify-between">
-        <p className="text-sm text-muted-foreground">
+        <p className="font-mono text-xs tabular-nums text-muted-foreground">
           {totalFiltered === 0
             ? "Showing 0 events"
-            : `Showing ${pageStart}–${pageEnd} of ${totalFiltered} events`}
+            : `Showing ${pageStart} to ${pageEnd} of ${totalFiltered} events`}
           {truncated && " (limited to the 300 most recent)"}
         </p>
         <div className="flex gap-2">

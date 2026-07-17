@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+import { toast } from "sonner";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Card,
@@ -15,6 +17,16 @@ import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
+import {
+  Dialog,
+  DialogClose,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import {
   Building2,
   Clock,
@@ -43,7 +55,25 @@ const holidays = [
   { date: "Jan 1", name: "New Year's Day" },
 ];
 
+// The exact phrase a user must type before account deletion is enabled.
+const DELETE_CONFIRM_PHRASE = "DELETE";
+
 export default function SettingsPage() {
+  const [deleteConfirm, setDeleteConfirm] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const canDelete = deleteConfirm.trim() === DELETE_CONFIRM_PHRASE;
+
+  function handleDeactivate() {
+    toast.success("Agent deactivated. No calls will be handled until reactivated.");
+  }
+
+  function handleDeleteAllData() {
+    if (!canDelete) return;
+    setDeleteOpen(false);
+    setDeleteConfirm("");
+    toast.success("Data deletion requested. This can take up to 24 hours to complete.");
+  }
+
   return (
     <div className="space-y-6">
       <div>
@@ -109,6 +139,7 @@ export default function SettingsPage() {
                   <Input
                     id="phone"
                     type="tel"
+                    className="font-mono"
                     defaultValue="+1 (555) 123-4567"
                   />
                 </div>
@@ -174,17 +205,17 @@ export default function SettingsPage() {
                       </span>
                     </div>
                     {item.open ? (
-                      <div className="flex items-center gap-2 ml-auto">
+                      <div className="ml-auto flex items-center gap-2">
                         <Input
                           defaultValue={item.openTime}
-                          className="w-28 text-center text-sm"
+                          className="w-28 text-center font-mono text-sm"
                         />
                         <span className="text-sm text-muted-foreground">
                           to
                         </span>
                         <Input
                           defaultValue={item.closeTime}
-                          className="w-28 text-center text-sm"
+                          className="w-28 text-center font-mono text-sm"
                         />
                       </div>
                     ) : (
@@ -219,7 +250,7 @@ export default function SettingsPage() {
                       className="flex items-center gap-3 rounded-lg border px-3 py-2"
                     >
                       <Calendar className="size-4 text-muted-foreground" />
-                      <span className="text-sm font-medium">{h.date}</span>
+                      <span className="font-mono text-sm font-medium">{h.date}</span>
                       <span className="text-sm text-muted-foreground">
                         {h.name}
                       </span>
@@ -405,6 +436,7 @@ export default function SettingsPage() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
+              {/* Deactivate Agent (confirm dialog) */}
               <div className="flex items-center justify-between rounded-lg border border-destructive/30 p-4">
                 <div className="space-y-0.5">
                   <h4 className="text-sm font-medium">Deactivate Agent</h4>
@@ -413,12 +445,41 @@ export default function SettingsPage() {
                     until reactivated.
                   </p>
                 </div>
-                <Button variant="outline" className="border-destructive/50 text-destructive hover:bg-destructive/10">
-                  <Power className="mr-1.5 size-4" />
-                  Deactivate Agent
-                </Button>
+                <Dialog>
+                  <DialogTrigger
+                    render={
+                      <Button
+                        variant="outline"
+                        className="border-destructive/50 text-destructive hover:bg-destructive/10"
+                      >
+                        <Power className="mr-1.5 size-4" />
+                        Deactivate Agent
+                      </Button>
+                    }
+                  />
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle>Deactivate the agent?</DialogTitle>
+                      <DialogDescription>
+                        While deactivated, the AI agent will not answer any
+                        calls. You can reactivate it at any time.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <DialogFooter>
+                      <DialogClose render={<Button variant="outline">Cancel</Button>} />
+                      <DialogClose
+                        render={
+                          <Button variant="destructive" onClick={handleDeactivate}>
+                            Deactivate Agent
+                          </Button>
+                        }
+                      />
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
 
+              {/* Export Data */}
               <div className="flex items-center justify-between rounded-lg border border-destructive/30 p-4">
                 <div className="space-y-0.5">
                   <h4 className="text-sm font-medium">Export Data</h4>
@@ -433,6 +494,7 @@ export default function SettingsPage() {
                 </Button>
               </div>
 
+              {/* Delete All Data (type-to-confirm dialog) */}
               <div className="flex items-center justify-between rounded-lg border border-destructive/30 p-4">
                 <div className="space-y-0.5">
                   <h4 className="text-sm font-medium">Delete All Data</h4>
@@ -441,10 +503,61 @@ export default function SettingsPage() {
                     transcripts. This action cannot be undone.
                   </p>
                 </div>
-                <Button variant="destructive">
-                  <Trash2 className="mr-1.5 size-4" />
-                  Delete All Data
-                </Button>
+                <Dialog
+                  open={deleteOpen}
+                  onOpenChange={(open) => {
+                    setDeleteOpen(open);
+                    if (!open) setDeleteConfirm("");
+                  }}
+                >
+                  <DialogTrigger
+                    render={
+                      <Button variant="destructive">
+                        <Trash2 className="mr-1.5 size-4" />
+                        Delete All Data
+                      </Button>
+                    }
+                  />
+                  <DialogContent>
+                    <DialogHeader>
+                      <DialogTitle className="text-destructive">
+                        Delete all data permanently?
+                      </DialogTitle>
+                      <DialogDescription>
+                        This permanently deletes every call record, recording,
+                        and transcript. It cannot be undone.
+                      </DialogDescription>
+                    </DialogHeader>
+                    <div className="grid gap-2">
+                      <Label htmlFor="delete-confirm">
+                        Type{" "}
+                        <span className="font-mono font-semibold text-foreground">
+                          {DELETE_CONFIRM_PHRASE}
+                        </span>{" "}
+                        to confirm
+                      </Label>
+                      <Input
+                        id="delete-confirm"
+                        value={deleteConfirm}
+                        onChange={(e) => setDeleteConfirm(e.target.value)}
+                        placeholder={DELETE_CONFIRM_PHRASE}
+                        autoComplete="off"
+                        aria-invalid={deleteConfirm.length > 0 && !canDelete}
+                      />
+                    </div>
+                    <DialogFooter>
+                      <DialogClose render={<Button variant="outline">Cancel</Button>} />
+                      <Button
+                        variant="destructive"
+                        disabled={!canDelete}
+                        onClick={handleDeleteAllData}
+                      >
+                        <Trash2 className="mr-1.5 size-4" />
+                        Delete All Data
+                      </Button>
+                    </DialogFooter>
+                  </DialogContent>
+                </Dialog>
               </div>
             </CardContent>
           </Card>
