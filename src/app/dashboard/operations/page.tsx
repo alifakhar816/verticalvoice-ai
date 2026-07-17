@@ -1,5 +1,4 @@
-"use client";
-
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -8,7 +7,6 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Heart,
   UtensilsCrossed,
@@ -25,506 +23,661 @@ import {
   Eye,
   Wrench,
 } from "lucide-react";
+import { createServerClient } from "@/lib/database/supabase-server";
+import { getCurrentTenantId } from "@/domain/tenants/current";
 
-// ── Healthcare mock data ──────────────────────────────────────────────
+type BadgeVariant = "success" | "warning" | "destructive" | "outline";
 
-const appointments = [
-  { patient: "Sarah Johnson", date: "Jul 15", time: "9:00 AM", type: "Follow-up", status: "Confirmed" },
-  { patient: "Michael Chen", date: "Jul 15", time: "10:30 AM", type: "New Patient", status: "Pending" },
-  { patient: "Emily Davis", date: "Jul 15", time: "1:00 PM", type: "Annual Check", status: "Confirmed" },
-  { patient: "Robert Wilson", date: "Jul 16", time: "11:00 AM", type: "Consultation", status: "Cancelled" },
-  { patient: "Lisa Thompson", date: "Jul 16", time: "2:30 PM", type: "Follow-up", status: "Pending" },
-];
+const STATUS_SUCCESS = ["confirmed", "verified", "approved", "active", "ready", "delivered", "resolved", "completed"];
+const STATUS_WARNING = ["pending", "waiting", "waitlisted", "in_progress", "scheduled", "preparing", "open", "new"];
+const STATUS_DESTRUCTIVE = ["cancelled", "denied", "failed", "no_show"];
 
-const waitlist = [
-  { patient: "James Brown", requestedDate: "Jul 14", priority: "High" },
-  { patient: "Amanda Lee", requestedDate: "Jul 15", priority: "Medium" },
-  { patient: "David Park", requestedDate: "Jul 17", priority: "Low" },
-];
+function statusBadge(status: string | null | undefined) {
+  const s = (status ?? "unknown").toLowerCase();
+  const variant: BadgeVariant = STATUS_SUCCESS.includes(s)
+    ? "success"
+    : STATUS_WARNING.includes(s)
+      ? "warning"
+      : STATUS_DESTRUCTIVE.includes(s)
+        ? "destructive"
+        : "outline";
+  return <Badge variant={variant}>{status ?? "Unknown"}</Badge>;
+}
 
-const refillRequests = [
-  { patient: "Karen White", medication: "Lisinopril 10mg", status: "Approved" },
-  { patient: "Tom Garcia", medication: "Metformin 500mg", status: "Pending" },
-  { patient: "Nancy Hall", medication: "Atorvastatin 20mg", status: "Approved" },
-  { patient: "Chris Martin", medication: "Omeprazole 20mg", status: "Denied" },
-];
+function priorityBadge(priority: string | null | undefined) {
+  const p = (priority ?? "").toLowerCase();
+  const variant: BadgeVariant = p === "high" || p === "emergency" ? "destructive" : p === "medium" || p === "urgent" ? "warning" : "outline";
+  return <Badge variant={variant}>{priority ?? "—"}</Badge>;
+}
 
-const insuranceQueue = [
-  { patient: "Julia Roberts", provider: "Blue Cross", status: "Verified" },
-  { patient: "Mark Stevens", provider: "Aetna", status: "Pending" },
-  { patient: "Sandra Kim", provider: "United Health", status: "Failed" },
-];
+function formatDateTime(iso: string | null | undefined) {
+  if (!iso) return "—";
+  return new Date(iso).toLocaleString("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  });
+}
 
-// ── Restaurant mock data ──────────────────────────────────────────────
+function formatMoney(cents: number | null | undefined) {
+  if (cents == null) return "—";
+  return `$${(cents / 100).toLocaleString("en-US", { minimumFractionDigits: 0 })}`;
+}
 
-const reservations = [
-  { name: "Smith Party", size: 4, datetime: "Jul 15, 7:00 PM", status: "Confirmed", notes: "Window seat" },
-  { name: "Johnson", size: 2, datetime: "Jul 15, 7:30 PM", status: "Confirmed", notes: "Anniversary" },
-  { name: "Williams Group", size: 8, datetime: "Jul 15, 8:00 PM", status: "Waitlisted", notes: "Private room" },
-  { name: "Davis", size: 3, datetime: "Jul 16, 6:30 PM", status: "Confirmed", notes: "" },
-  { name: "Brown Family", size: 6, datetime: "Jul 16, 7:00 PM", status: "Cancelled", notes: "Rescheduling" },
-];
-
-const orders = [
-  { id: "#1042", items: 3, status: "Preparing", time: "12 min ago" },
-  { id: "#1043", items: 5, status: "Ready", time: "8 min ago" },
-  { id: "#1044", items: 2, status: "Preparing", time: "5 min ago" },
-  { id: "#1045", items: 4, status: "Delivered", time: "2 min ago" },
-];
-
-const cateringLeads = [
-  { name: "Corporate Event Co.", eventDate: "Aug 5", partySize: 50, status: "Proposal Sent" },
-  { name: "Maria's Wedding", eventDate: "Sep 12", partySize: 120, status: "Initial Inquiry" },
-  { name: "Tech Startup Lunch", eventDate: "Jul 28", partySize: 25, status: "Confirmed" },
-];
-
-// ── Real Estate mock data ──────────────────────────────────────────────
-
-const leads = [
-  { name: "Alex Turner", interest: "3BR Family Home", budget: "$450K", source: "Website", status: "Hot" },
-  { name: "Priya Patel", interest: "Downtown Condo", budget: "$320K", source: "Zillow", status: "Warm" },
-  { name: "Jake Morrison", interest: "Investment Property", budget: "$600K", source: "Referral", status: "Hot" },
-  { name: "Carol White", interest: "Starter Home", budget: "$250K", source: "Call-In", status: "Cold" },
-  { name: "Sam Nguyen", interest: "Luxury Estate", budget: "$1.2M", source: "Website", status: "Warm" },
-];
-
-const showings = [
-  { property: "123 Oak St", client: "Alex Turner", datetime: "Jul 15, 2:00 PM", agent: "Sarah M." },
-  { property: "456 Pine Ave", client: "Priya Patel", datetime: "Jul 15, 4:00 PM", agent: "John D." },
-  { property: "789 Elm Dr", client: "Jake Morrison", datetime: "Jul 16, 10:00 AM", agent: "Sarah M." },
-  { property: "321 Maple Ln", client: "Sam Nguyen", datetime: "Jul 16, 1:00 PM", agent: "Lisa K." },
-];
-
-const listings = [
-  { address: "123 Oak Street, Apt 4B", price: "$425,000", status: "Active" },
-  { address: "456 Pine Avenue", price: "$675,000", status: "Pending" },
-  { address: "789 Elm Drive", price: "$350,000", status: "Active" },
-];
-
-const maintenance = [
-  { property: "321 Maple Ln, Unit 2", issue: "Leaking faucet", priority: "Medium", status: "In Progress" },
-  { property: "123 Oak St, Apt 7A", issue: "HVAC not cooling", priority: "High", status: "Scheduled" },
-  { property: "456 Pine Ave", issue: "Garage door sensor", priority: "Low", status: "Open" },
-];
-
-// ── Helpers ──────────────────────────────────────────────────
-
-function statusBadge(status: string) {
-  const variants: Record<string, string> = {
-    Confirmed: "border-green-500 text-green-600",
-    Verified: "border-green-500 text-green-600",
-    Approved: "border-green-500 text-green-600",
-    Active: "border-green-500 text-green-600",
-    Ready: "border-green-500 text-green-600",
-    Delivered: "border-green-500 text-green-600",
-    Pending: "border-amber-500 text-amber-600",
-    Waitlisted: "border-amber-500 text-amber-600",
-    "In Progress": "border-amber-500 text-amber-600",
-    "Proposal Sent": "border-amber-500 text-amber-600",
-    "Initial Inquiry": "border-blue-500 text-blue-600",
-    Scheduled: "border-blue-500 text-blue-600",
-    Preparing: "border-blue-500 text-blue-600",
-    Cancelled: "border-red-500 text-red-600",
-    Denied: "border-red-500 text-red-600",
-    Failed: "border-red-500 text-red-600",
-    Open: "border-muted-foreground text-muted-foreground",
-  };
+function CallLink({ callId, children }: { callId: string | null; children: React.ReactNode }) {
+  if (!callId) return <>{children}</>;
   return (
-    <Badge variant="outline" className={variants[status] ?? ""}>
-      {status}
-    </Badge>
+    <Link href={`/dashboard/calls/${callId}`} className="hover:underline">
+      {children}
+    </Link>
   );
 }
 
-function priorityBadge(priority: string) {
-  const variants: Record<string, string> = {
-    High: "border-red-500 text-red-600",
-    Medium: "border-amber-500 text-amber-600",
-    Low: "border-muted-foreground text-muted-foreground",
-  };
+function EmptyRow({ label }: { label: string }) {
+  return <p className="py-6 text-center text-sm text-muted-foreground">{label}</p>;
+}
+
+const VERTICAL_TINT = {
+  healthcare: { icon: "text-vertical-healthcare", border: "border-t-vertical-healthcare/40" },
+  restaurant: { icon: "text-vertical-restaurant", border: "border-t-vertical-restaurant/40" },
+  realestate: { icon: "text-vertical-realestate", border: "border-t-vertical-realestate/40" },
+} as const;
+
+// ─── Healthcare ──────────────────────────────────────────────────────
+
+async function HealthcarePanel({ supabase, tenantId }: { supabase: Awaited<ReturnType<typeof createServerClient>>; tenantId: string }) {
+  const t = VERTICAL_TINT.healthcare;
+  const nowIso = new Date().toISOString();
+
+  const [{ data: appointments }, { data: waitlist }, { data: refills }, { data: insurance }] = await Promise.all([
+    supabase
+      .from("appointments")
+      .select("id, call_id, patient_name, scheduled_at, reason, status")
+      .eq("tenant_id", tenantId)
+      .neq("status", "cancelled")
+      .gte("scheduled_at", nowIso)
+      .order("scheduled_at", { ascending: true })
+      .limit(10),
+    supabase
+      .from("waitlist_entries")
+      .select("id, patient_name, status, priority, created_at")
+      .eq("tenant_id", tenantId)
+      .eq("status", "waiting")
+      .order("priority", { ascending: false })
+      .limit(10),
+    supabase
+      .from("refill_requests")
+      .select("id, call_id, patient_name, medication_name, status")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("insurance_intakes")
+      .select("id, call_id, patient_name, insurance_provider, status")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
+
   return (
-    <Badge variant="outline" className={variants[priority] ?? ""}>
-      {priority}
-    </Badge>
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Card className={`border-t-2 ${t.border}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <CalendarCheck className={`size-5 ${t.icon}`} />
+            Appointments
+          </CardTitle>
+          <CardDescription>Upcoming scheduled appointments</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!appointments?.length ? (
+            <EmptyRow label="No upcoming appointments yet — booked calls will show up here." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="pb-2 font-medium">Patient</th>
+                    <th className="pb-2 font-medium">When</th>
+                    <th className="pb-2 font-medium">Reason</th>
+                    <th className="pb-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {appointments.map((a) => (
+                    <tr key={a.id} className="border-b last:border-0">
+                      <td className="py-2 font-medium">
+                        <CallLink callId={a.call_id}>{a.patient_name}</CallLink>
+                      </td>
+                      <td className="py-2 font-mono text-muted-foreground">{formatDateTime(a.scheduled_at)}</td>
+                      <td className="py-2 text-muted-foreground">{a.reason || "—"}</td>
+                      <td className="py-2">{statusBadge(a.status)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className={`border-t-2 ${t.border}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Clock className={`size-5 ${t.icon}`} />
+            Waitlist
+          </CardTitle>
+          <CardDescription>Patients waiting for openings</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!waitlist?.length ? (
+            <EmptyRow label="No one on the waitlist right now." />
+          ) : (
+            waitlist.map((w) => (
+              <div key={w.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="font-medium">{w.patient_name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    Added: <span className="font-mono">{formatDateTime(w.created_at)}</span>
+                  </p>
+                </div>
+                {priorityBadge(w.priority != null ? String(w.priority) : null)}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className={`border-t-2 ${t.border}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Pill className={`size-5 ${t.icon}`} />
+            Refill Requests
+          </CardTitle>
+          <CardDescription>Prescription refill queue</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!refills?.length ? (
+            <EmptyRow label="No refill requests yet." />
+          ) : (
+            refills.map((r) => (
+              <div key={r.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="font-medium">
+                    <CallLink callId={r.call_id}>{r.patient_name}</CallLink>
+                  </p>
+                  <p className="text-xs text-muted-foreground">{r.medication_name}</p>
+                </div>
+                {statusBadge(r.status)}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className={`border-t-2 ${t.border}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ShieldCheck className={`size-5 ${t.icon}`} />
+            Insurance Queue
+          </CardTitle>
+          <CardDescription>Verification requests</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!insurance?.length ? (
+            <EmptyRow label="No insurance verifications pending." />
+          ) : (
+            insurance.map((q) => (
+              <div key={q.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="font-medium">
+                    <CallLink callId={q.call_id}>{q.patient_name}</CallLink>
+                  </p>
+                  <p className="text-xs text-muted-foreground">{q.insurance_provider}</p>
+                </div>
+                {statusBadge(q.status)}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
 
-function leadStatusBadge(status: string) {
-  const variants: Record<string, string> = {
-    Hot: "bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300",
-    Warm: "bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300",
-    Cold: "bg-blue-100 text-blue-700 dark:bg-blue-900 dark:text-blue-300",
-  };
+// ─── Restaurant ──────────────────────────────────────────────────────
+
+async function RestaurantPanel({ supabase, tenantId }: { supabase: Awaited<ReturnType<typeof createServerClient>>; tenantId: string }) {
+  const t = VERTICAL_TINT.restaurant;
+  const nowIso = new Date().toISOString();
+
+  const [{ data: reservations }, { data: orders }, { data: menuItems }, { data: cateringLeads }] = await Promise.all([
+    supabase
+      .from("reservations")
+      .select("id, call_id, guest_name, party_size, scheduled_at, status, special_requests")
+      .eq("tenant_id", tenantId)
+      .neq("status", "cancelled")
+      .gte("scheduled_at", nowIso)
+      .order("scheduled_at", { ascending: true })
+      .limit(10),
+    supabase
+      .from("orders")
+      .select("id, call_id, order_number, order_type, status, total_cents, created_at")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("menu_items")
+      .select("id, updated_at")
+      .eq("tenant_id", tenantId),
+    supabase
+      .from("catering_leads")
+      .select("id, call_id, contact_name, event_date, guest_count, status")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
+
+  const menuCount = menuItems?.length ?? 0;
+  const lastMenuUpdate = menuItems?.length
+    ? menuItems.reduce((latest, m) => (m.updated_at && m.updated_at > latest ? m.updated_at : latest), menuItems[0].updated_at ?? "")
+    : null;
+
   return (
-    <Badge className={variants[status] ?? ""}>
-      {status}
-    </Badge>
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Card className={`border-t-2 ${t.border} lg:col-span-2`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className={`size-5 ${t.icon}`} />
+            Reservations
+          </CardTitle>
+          <CardDescription>Upcoming table reservations</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!reservations?.length ? (
+            <EmptyRow label="No upcoming reservations yet — booked calls will show up here." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="pb-2 font-medium">Name</th>
+                    <th className="pb-2 font-medium">Party Size</th>
+                    <th className="pb-2 font-medium">Date/Time</th>
+                    <th className="pb-2 font-medium">Status</th>
+                    <th className="pb-2 font-medium">Notes</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {reservations.map((r) => (
+                    <tr key={r.id} className="border-b last:border-0">
+                      <td className="py-2 font-medium">
+                        <CallLink callId={r.call_id}>{r.guest_name}</CallLink>
+                      </td>
+                      <td className="py-2 font-mono text-muted-foreground">{r.party_size}</td>
+                      <td className="py-2 font-mono text-muted-foreground">{formatDateTime(r.scheduled_at)}</td>
+                      <td className="py-2">{statusBadge(r.status)}</td>
+                      <td className="py-2 text-muted-foreground">
+                        {r.special_requests || <span className="text-muted-foreground/50">None</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className={`border-t-2 ${t.border}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <ChefHat className={`size-5 ${t.icon}`} />
+            Recent Orders
+          </CardTitle>
+          <CardDescription>Latest order activity</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!orders?.length ? (
+            <EmptyRow label="No orders yet." />
+          ) : (
+            orders.map((o) => (
+              <div key={o.id} className="flex items-center justify-between rounded-lg border p-3">
+                <div>
+                  <p className="font-mono font-medium">
+                    <CallLink callId={o.call_id}>{o.order_number}</CallLink>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {o.order_type} &middot; {formatMoney(o.total_cents)}
+                  </p>
+                </div>
+                {statusBadge(o.status)}
+              </div>
+            ))
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="space-y-6">
+        <Card className={`border-t-2 ${t.border}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <ClipboardList className={`size-5 ${t.icon}`} />
+              Menu
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="font-mono text-2xl font-bold">{menuCount}</p>
+                <p className="text-xs text-muted-foreground">Menu items on file</p>
+              </div>
+              <div className="text-right">
+                <p className="text-sm text-muted-foreground">Last updated</p>
+                <p className="font-mono text-sm font-medium">{lastMenuUpdate ? formatDateTime(lastMenuUpdate) : "—"}</p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className={`border-t-2 ${t.border}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Megaphone className={`size-5 ${t.icon}`} />
+              Catering Leads
+            </CardTitle>
+            <CardDescription>Incoming catering inquiries</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!cateringLeads?.length ? (
+              <EmptyRow label="No catering inquiries yet." />
+            ) : (
+              cateringLeads.map((c) => (
+                <div key={c.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="font-medium">
+                      <CallLink callId={c.call_id}>{c.contact_name}</CallLink>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {c.event_date ? formatDateTime(c.event_date) : "Date TBD"} &middot;{" "}
+                      <span className="font-mono">{c.guest_count ?? "?"}</span> guests
+                    </p>
+                  </div>
+                  {statusBadge(c.status)}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 }
 
-// ── Page ──────────────────────────────────────────────────
+// ─── Real Estate ─────────────────────────────────────────────────────
 
-export default function OperationsPage() {
+function fullAddress(listing: { address_line1: string; city: string; state: string } | null) {
+  if (!listing) return "Unknown listing";
+  return `${listing.address_line1}, ${listing.city}, ${listing.state}`;
+}
+
+async function RealEstatePanel({ supabase, tenantId }: { supabase: Awaited<ReturnType<typeof createServerClient>>; tenantId: string }) {
+  const t = VERTICAL_TINT.realestate;
+  const nowIso = new Date().toISOString();
+
+  const [{ data: leads }, { data: showingRows }, { data: listings }, { data: maintenanceRows }] = await Promise.all([
+    supabase
+      .from("real_estate_leads")
+      .select("id, call_id, first_name, last_name, lead_type, budget_min_cents, budget_max_cents, source, status")
+      .eq("tenant_id", tenantId)
+      .order("created_at", { ascending: false })
+      .limit(10),
+    supabase
+      .from("showings")
+      .select("id, call_id, scheduled_at, status, listing_id, agent_id")
+      .eq("tenant_id", tenantId)
+      .gte("scheduled_at", nowIso)
+      .order("scheduled_at", { ascending: true })
+      .limit(10),
+    supabase
+      .from("listings")
+      .select("id, address_line1, city, state, price_cents, status")
+      .eq("tenant_id", tenantId)
+      .eq("status", "active")
+      .limit(6),
+    supabase
+      .from("maintenance_requests")
+      .select("id, call_id, category, priority, status, unit_id")
+      .eq("tenant_id", tenantId)
+      .neq("status", "completed")
+      .order("created_at", { ascending: false })
+      .limit(10),
+  ]);
+
+  // Embedded foreign-table selects (showings->listings/re_agents,
+  // maintenance_requests->property_management_units) don't type-check
+  // cleanly against the generated Database types at this join depth, so
+  // resolve the small number of referenced rows separately and join in JS.
+  const showings = showingRows ?? [];
+  const maintenance = maintenanceRows ?? [];
+
+  const listingIds = [...new Set(showings.map((s) => s.listing_id).filter(Boolean))];
+  const agentIds = [...new Set(showings.map((s) => s.agent_id).filter((id): id is string => !!id))];
+  const unitIds = [...new Set(maintenance.map((m) => m.unit_id).filter(Boolean))];
+
+  const [{ data: showingListings }, { data: showingAgents }, { data: units }] = await Promise.all([
+    listingIds.length
+      ? supabase.from("listings").select("id, address_line1, city, state").in("id", listingIds)
+      : Promise.resolve({ data: [] as { id: string; address_line1: string; city: string; state: string }[] }),
+    agentIds.length
+      ? supabase.from("re_agents").select("id, first_name, last_name").in("id", agentIds)
+      : Promise.resolve({ data: [] as { id: string; first_name: string; last_name: string }[] }),
+    unitIds.length
+      ? supabase.from("property_management_units").select("id, address").in("id", unitIds)
+      : Promise.resolve({ data: [] as { id: string; address: string }[] }),
+  ]);
+
+  const listingById = new Map((showingListings ?? []).map((l) => [l.id, l]));
+  const agentById = new Map((showingAgents ?? []).map((a) => [a.id, a]));
+  const unitById = new Map((units ?? []).map((u) => [u.id, u]));
+
+  return (
+    <div className="grid gap-6 lg:grid-cols-2">
+      <Card className={`border-t-2 ${t.border} lg:col-span-2`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Users className={`size-5 ${t.icon}`} />
+            Leads
+          </CardTitle>
+          <CardDescription>Incoming buyer and seller leads</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {!leads?.length ? (
+            <EmptyRow label="No leads yet — calls that capture buyer/seller info will show up here." />
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b text-left text-xs uppercase tracking-wider text-muted-foreground">
+                    <th className="pb-2 font-medium">Name</th>
+                    <th className="pb-2 font-medium">Type</th>
+                    <th className="pb-2 font-medium">Budget</th>
+                    <th className="pb-2 font-medium">Source</th>
+                    <th className="pb-2 font-medium">Status</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {leads.map((l) => (
+                    <tr key={l.id} className="border-b last:border-0">
+                      <td className="py-2 font-medium">
+                        <CallLink callId={l.call_id}>
+                          {l.first_name} {l.last_name}
+                        </CallLink>
+                      </td>
+                      <td className="py-2 capitalize">{l.lead_type}</td>
+                      <td className="py-2 font-mono text-muted-foreground">
+                        {l.budget_max_cents ? formatMoney(l.budget_max_cents) : "—"}
+                      </td>
+                      <td className="py-2">{l.source || "—"}</td>
+                      <td className="py-2">{statusBadge(l.status)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className={`border-t-2 ${t.border}`}>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Eye className={`size-5 ${t.icon}`} />
+            Upcoming Showings
+          </CardTitle>
+          <CardDescription>Scheduled property viewings</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!showings.length ? (
+            <EmptyRow label="No showings scheduled." />
+          ) : (
+            showings.map((s) => {
+              const listing = listingById.get(s.listing_id) ?? null;
+              const agent = s.agent_id ? (agentById.get(s.agent_id) ?? null) : null;
+              return (
+                <div key={s.id} className="rounded-lg border p-3">
+                  <div className="flex items-center justify-between">
+                    <p className="font-medium">
+                      <CallLink callId={s.call_id}>{fullAddress(listing)}</CallLink>
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {agent ? `${agent.first_name} ${agent.last_name[0]}.` : "Unassigned"}
+                    </p>
+                  </div>
+                  <p className="text-xs text-muted-foreground">
+                    <span className="font-mono">{formatDateTime(s.scheduled_at)}</span>
+                  </p>
+                </div>
+              );
+            })
+          )}
+        </CardContent>
+      </Card>
+
+      <div className="space-y-6">
+        <Card className={`border-t-2 ${t.border}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Home className={`size-5 ${t.icon}`} />
+              Active Listings
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!listings?.length ? (
+              <EmptyRow label="No active listings on file." />
+            ) : (
+              listings.map((l) => (
+                <div key={l.id} className="flex items-center justify-between rounded-lg border p-3">
+                  <div>
+                    <p className="font-medium">{fullAddress(l)}</p>
+                    <p className="font-mono text-sm text-muted-foreground">{formatMoney(l.price_cents)}</p>
+                  </div>
+                  {statusBadge(l.status)}
+                </div>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className={`border-t-2 ${t.border}`}>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Wrench className={`size-5 ${t.icon}`} />
+              Maintenance Requests
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {!maintenance.length ? (
+              <EmptyRow label="No open maintenance requests." />
+            ) : (
+              maintenance.map((m) => {
+                const unit = unitById.get(m.unit_id) ?? null;
+                return (
+                  <div key={m.id} className="rounded-lg border p-3">
+                    <div className="flex items-center justify-between">
+                      <p className="font-medium">
+                        <CallLink callId={m.call_id}>{unit?.address ?? "Unknown property"}</CallLink>
+                      </p>
+                      {priorityBadge(m.priority)}
+                    </div>
+                    <div className="mt-1 flex items-center justify-between">
+                      <p className="text-xs text-muted-foreground">{m.category}</p>
+                      {statusBadge(m.status)}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+// ─── Page ────────────────────────────────────────────────────────────
+
+function NoTenantState() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>No tenant configured for this account</CardTitle>
+        <CardDescription>
+          Your account isn&apos;t linked to any tenant yet, so there&apos;s nothing to show here.
+        </CardDescription>
+      </CardHeader>
+    </Card>
+  );
+}
+
+const INDUSTRY_META = {
+  healthcare: { label: "Healthcare", icon: Heart, tint: VERTICAL_TINT.healthcare.icon },
+  restaurant: { label: "Restaurant", icon: UtensilsCrossed, tint: VERTICAL_TINT.restaurant.icon },
+  real_estate: { label: "Real Estate", icon: Building2, tint: VERTICAL_TINT.realestate.icon },
+} as const;
+
+export default async function OperationsPage() {
+  const supabase = await createServerClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
+  if (!user) return <NoTenantState />;
+
+  const tenantId = await getCurrentTenantId(user.id);
+  if (!tenantId) return <NoTenantState />;
+
+  const { data: tenant } = await supabase.from("tenants").select("industry").eq("id", tenantId).single();
+  const industry = (tenant?.industry ?? "healthcare") as keyof typeof INDUSTRY_META;
+  const meta = INDUSTRY_META[industry] ?? INDUSTRY_META.healthcare;
+  const Icon = meta.icon;
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold tracking-tight">Industry Operations</h1>
+        <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight">
+          <Icon className={`size-7 ${meta.tint}`} />
+          {meta.label} Operations
+        </h1>
         <p className="text-muted-foreground">
-          Manage industry-specific workflows handled by your AI agent.
+          Real bookings, queries, and outcomes captured by your AI agent — every row links back to the call it came from.
         </p>
       </div>
 
-      <Tabs defaultValue="healthcare" className="space-y-6">
-        <TabsList>
-          <TabsTrigger value="healthcare" className="flex items-center gap-1.5">
-            <Heart className="size-4" />
-            Healthcare
-          </TabsTrigger>
-          <TabsTrigger value="restaurant" className="flex items-center gap-1.5">
-            <UtensilsCrossed className="size-4" />
-            Restaurant
-          </TabsTrigger>
-          <TabsTrigger value="realestate" className="flex items-center gap-1.5">
-            <Building2 className="size-4" />
-            Real Estate
-          </TabsTrigger>
-        </TabsList>
-
-        {/* ── Healthcare ── */}
-        <TabsContent value="healthcare" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Appointments */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <CalendarCheck className="size-5" />
-                  Appointments
-                </CardTitle>
-                <CardDescription>Upcoming scheduled appointments</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 font-medium">Patient</th>
-                        <th className="pb-2 font-medium">Date</th>
-                        <th className="pb-2 font-medium">Time</th>
-                        <th className="pb-2 font-medium">Type</th>
-                        <th className="pb-2 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {appointments.map((a, i) => (
-                        <tr key={i} className="border-b last:border-0">
-                          <td className="py-2 font-medium">{a.patient}</td>
-                          <td className="py-2">{a.date}</td>
-                          <td className="py-2">{a.time}</td>
-                          <td className="py-2">{a.type}</td>
-                          <td className="py-2">{statusBadge(a.status)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Waitlist */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Clock className="size-5" />
-                  Waitlist
-                </CardTitle>
-                <CardDescription>Patients waiting for openings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {waitlist.map((w, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{w.patient}</p>
-                      <p className="text-xs text-muted-foreground">Requested: {w.requestedDate}</p>
-                    </div>
-                    {priorityBadge(w.priority)}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Refill Requests */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Pill className="size-5" />
-                  Refill Requests
-                </CardTitle>
-                <CardDescription>Prescription refill queue</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {refillRequests.map((r, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{r.patient}</p>
-                      <p className="text-xs text-muted-foreground">{r.medication}</p>
-                    </div>
-                    {statusBadge(r.status)}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Insurance Queue */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ShieldCheck className="size-5" />
-                  Insurance Queue
-                </CardTitle>
-                <CardDescription>Verification requests</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {insuranceQueue.map((q, i) => (
-                  <div key={i} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{q.patient}</p>
-                      <p className="text-xs text-muted-foreground">{q.provider}</p>
-                    </div>
-                    {statusBadge(q.status)}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-          </div>
-        </TabsContent>
-
-        {/* ── Restaurant ── */}
-        <TabsContent value="restaurant" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Reservations */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="size-5" />
-                  Reservations
-                </CardTitle>
-                <CardDescription>Upcoming table reservations</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 font-medium">Name</th>
-                        <th className="pb-2 font-medium">Party Size</th>
-                        <th className="pb-2 font-medium">Date/Time</th>
-                        <th className="pb-2 font-medium">Status</th>
-                        <th className="pb-2 font-medium">Notes</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {reservations.map((r, i) => (
-                        <tr key={i} className="border-b last:border-0">
-                          <td className="py-2 font-medium">{r.name}</td>
-                          <td className="py-2">{r.size}</td>
-                          <td className="py-2">{r.datetime}</td>
-                          <td className="py-2">{statusBadge(r.status)}</td>
-                          <td className="py-2 text-muted-foreground">{r.notes || "—"}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Active Orders */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <ChefHat className="size-5" />
-                  Active Orders
-                </CardTitle>
-                <CardDescription>Current order queue</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {orders.map((o) => (
-                  <div key={o.id} className="flex items-center justify-between rounded-lg border p-3">
-                    <div>
-                      <p className="font-medium">{o.id}</p>
-                      <p className="text-xs text-muted-foreground">{o.items} items &middot; {o.time}</p>
-                    </div>
-                    {statusBadge(o.status)}
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Menu + Catering */}
-            <div className="space-y-6">
-              {/* Menu Sync */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <ClipboardList className="size-5" />
-                    Menu
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="text-2xl font-bold">48</p>
-                      <p className="text-xs text-muted-foreground">Menu items synced</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-muted-foreground">Last sync</p>
-                      <p className="text-sm font-medium">2 hours ago</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Catering Leads */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Megaphone className="size-5" />
-                    Catering Leads
-                  </CardTitle>
-                  <CardDescription>Incoming catering inquiries</CardDescription>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {cateringLeads.map((c, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg border p-3">
-                      <div>
-                        <p className="font-medium">{c.name}</p>
-                        <p className="text-xs text-muted-foreground">
-                          {c.eventDate} &middot; {c.partySize} guests
-                        </p>
-                      </div>
-                      {statusBadge(c.status)}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-
-        {/* ── Real Estate ── */}
-        <TabsContent value="realestate" className="space-y-6">
-          <div className="grid gap-6 lg:grid-cols-2">
-            {/* Leads */}
-            <Card className="lg:col-span-2">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Users className="size-5" />
-                  Leads
-                </CardTitle>
-                <CardDescription>Incoming buyer and seller leads</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b text-left text-muted-foreground">
-                        <th className="pb-2 font-medium">Name</th>
-                        <th className="pb-2 font-medium">Interest</th>
-                        <th className="pb-2 font-medium">Budget</th>
-                        <th className="pb-2 font-medium">Source</th>
-                        <th className="pb-2 font-medium">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {leads.map((l, i) => (
-                        <tr key={i} className="border-b last:border-0">
-                          <td className="py-2 font-medium">{l.name}</td>
-                          <td className="py-2">{l.interest}</td>
-                          <td className="py-2">{l.budget}</td>
-                          <td className="py-2">{l.source}</td>
-                          <td className="py-2">{leadStatusBadge(l.status)}</td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Showings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Eye className="size-5" />
-                  Upcoming Showings
-                </CardTitle>
-                <CardDescription>Scheduled property viewings</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                {showings.map((s, i) => (
-                  <div key={i} className="rounded-lg border p-3">
-                    <div className="flex items-center justify-between">
-                      <p className="font-medium">{s.property}</p>
-                      <p className="text-xs text-muted-foreground">{s.agent}</p>
-                    </div>
-                    <p className="text-xs text-muted-foreground">
-                      {s.client} &middot; {s.datetime}
-                    </p>
-                  </div>
-                ))}
-              </CardContent>
-            </Card>
-
-            {/* Listings + Maintenance */}
-            <div className="space-y-6">
-              {/* Listings */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Home className="size-5" />
-                    Active Listings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {listings.map((l, i) => (
-                    <div key={i} className="flex items-center justify-between rounded-lg border p-3">
-                      <div>
-                        <p className="font-medium">{l.address}</p>
-                        <p className="text-sm text-muted-foreground">{l.price}</p>
-                      </div>
-                      {statusBadge(l.status)}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Maintenance */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Wrench className="size-5" />
-                    Maintenance Requests
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  {maintenance.map((m, i) => (
-                    <div key={i} className="rounded-lg border p-3">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium">{m.property}</p>
-                        {priorityBadge(m.priority)}
-                      </div>
-                      <div className="mt-1 flex items-center justify-between">
-                        <p className="text-xs text-muted-foreground">{m.issue}</p>
-                        {statusBadge(m.status)}
-                      </div>
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-            </div>
-          </div>
-        </TabsContent>
-      </Tabs>
+      {industry === "healthcare" && <HealthcarePanel supabase={supabase} tenantId={tenantId} />}
+      {industry === "restaurant" && <RestaurantPanel supabase={supabase} tenantId={tenantId} />}
+      {industry === "real_estate" && <RealEstatePanel supabase={supabase} tenantId={tenantId} />}
     </div>
   );
 }

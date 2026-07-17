@@ -33,7 +33,8 @@ function resolveUltravoxVoiceId(voiceId: string | null): string | null {
  */
 export async function createUltravoxCall(
   systemPrompt: string,
-  voiceId: string | null
+  voiceId: string | null,
+  selectedTools?: unknown[]
 ): Promise<UltravoxCallResponse> {
   const apiKey = process.env.ULTRAVOX_API_KEY;
   const baseUrl = process.env.ULTRAVOX_BASE_URL ?? 'https://api.ultravox.ai/api';
@@ -52,6 +53,7 @@ export async function createUltravoxCall(
       ...(resolvedVoiceId ? { voice: resolvedVoiceId } : {}),
       medium: { twilio: {} },
       recordingEnabled: true,
+      ...(selectedTools && selectedTools.length > 0 ? { selectedTools } : {}),
     }),
   });
 

@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/database/supabase-admin';
 import { validateTwilioSignature } from '@/lib/webhooks/signature';
 import { createUltravoxCall } from '@/lib/telephony/ultravox';
+import { buildSelectedTools } from '@/lib/telephony/ultravox-tools';
 import { logger } from '@/lib/observability/logger';
+import '@/industries';
+import { getIndustryPack } from '@/industries/core/registry';
+import type { IndustryId } from '@/industries/core/industry-pack';
 
 function twiml(xmlBody: string, status = 200) {
   return new NextResponse(
@@ -97,8 +101,41 @@ export async function POST(request: NextRequest) {
 
     const voiceId = snapshot?.voice?.voice_id ?? null;
 
+    const { data: tenantRow } = await supabase
+      .from('tenants')
+      .select('industry')
+      .eq('id', tenantId)
+      .single();
+    const industry = tenantRow?.industry as IndustryId | undefined;
+
+    // Record the call row first so we have an internal call.id to scope
+    // this call's tools to before creating the Ultravox call.
+    const { data: callRow } = await supabase
+      .from('calls')
+      .upsert(
+        {
+          tenant_id: tenantId,
+          provider_call_id: callSid,
+          status: 'ringing',
+          direction: 'inbound',
+          caller_number: fromNumber ?? null,
+          called_number: toNumber,
+          started_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        },
+        { onConflict: 'provider_call_id' }
+      )
+      .select('id')
+      .single();
+
+    const pack = industry ? getIndustryPack(industry) : undefined;
+    const selectedTools =
+      pack && callRow
+        ? buildSelectedTools(pack, { callId: callRow.id, tenantId, industry: pack.id })
+        : undefined;
+
     // Create the Ultravox call bridged to this Twilio call
-    const ultravoxCall = await createUltravoxCall(systemPrompt, voiceId);
+    const ultravoxCall = await createUltravoxCall(systemPrompt, voiceId, selectedTools);
 
     if (!ultravoxCall.joinUrl) {
       logger.error('twilio-voice-webhook: Ultravox call created without joinUrl', {
@@ -107,25 +144,11 @@ export async function POST(request: NextRequest) {
       return sayAndHangup('We could not connect you to our assistant right now. Please try again later.');
     }
 
-    // Record the call row so it shows up in the dashboard immediately
-    await supabase.from('calls').upsert(
-      {
-        tenant_id: tenantId,
-        provider_call_id: callSid,
-        status: 'ringing',
-        direction: 'inbound',
-        caller_number: fromNumber ?? null,
-        called_number: toNumber,
-        started_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'provider_call_id' }
-    );
-
     logger.info('twilio-voice-webhook: bridging call to Ultravox', {
       tenantId,
       callSid,
       ultravoxCallId: ultravoxCall.callId,
+      toolsAttached: selectedTools?.length ?? 0,
     });
 
     return twiml(

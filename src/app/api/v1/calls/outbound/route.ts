@@ -3,6 +3,7 @@ import { createServerClient } from "@/lib/database/supabase-server";
 import { createAdminClient } from "@/lib/database/supabase-admin";
 import { getCurrentTenantId } from "@/domain/tenants/current";
 import { createUltravoxCall } from "@/lib/telephony/ultravox";
+import { buildSelectedTools } from "@/lib/telephony/ultravox-tools";
 import { placeOutboundCall } from "@/lib/telephony/twilio";
 import { z } from "zod";
 import { phoneSchema } from "@/lib/validation/schemas";
@@ -139,28 +140,13 @@ export async function POST(request: NextRequest) {
     const filledScript = fillTemplate(callType.promptTemplate, variables);
     const systemPrompt = `You are an AI phone assistant calling on behalf of ${businessName}. This is an outbound ${callType.category} call. ${filledScript} Speak naturally and conversationally, keep the call concise, and end politely. If the person asks to not be called again, acknowledge that respectfully and end the call.`;
 
-    const ultravoxCall = await createUltravoxCall(systemPrompt, voiceId);
-    if (!ultravoxCall.joinUrl) {
-      return NextResponse.json(
-        { error: "Ultravox call was created without a joinUrl" },
-        { status: 502 }
-      );
-    }
-
-    const statusCallbackUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/v1/webhooks/twilio`;
-
-    const twilioCall = await placeOutboundCall({
-      to: to_number,
-      from: phoneNumber.number,
-      ultravoxJoinUrl: ultravoxCall.joinUrl,
-      statusCallbackUrl,
-    });
-
+    // Insert the call row first (provider_call_id is nullable) so we have
+    // our internal call.id to scope this call's tools to before Ultravox
+    // or Twilio are ever contacted.
     const { data: call, error: insertError } = await admin
       .from("calls")
       .insert({
         tenant_id,
-        provider_call_id: twilioCall.sid,
         direction: "outbound",
         status: "initiating",
         caller_number: phoneNumber.number,
@@ -178,6 +164,36 @@ export async function POST(request: NextRequest) {
         { status: 500 }
       );
     }
+
+    const selectedTools = buildSelectedTools(pack, {
+      callId: call.id,
+      tenantId: tenant_id,
+      industry: pack.id,
+    });
+
+    const ultravoxCall = await createUltravoxCall(systemPrompt, voiceId, selectedTools);
+    if (!ultravoxCall.joinUrl) {
+      await admin.from("calls").update({ status: "failed" }).eq("id", call.id);
+      return NextResponse.json(
+        { error: "Ultravox call was created without a joinUrl" },
+        { status: 502 }
+      );
+    }
+
+    const statusCallbackUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/v1/webhooks/twilio`;
+
+    const twilioCall = await placeOutboundCall({
+      to: to_number,
+      from: phoneNumber.number,
+      ultravoxJoinUrl: ultravoxCall.joinUrl,
+      statusCallbackUrl,
+    });
+
+    await admin
+      .from("calls")
+      .update({ provider_call_id: twilioCall.sid, updated_at: new Date().toISOString() })
+      .eq("id", call.id);
+    call.provider_call_id = twilioCall.sid;
 
     await admin.from("audit_events").insert({
       tenant_id,
