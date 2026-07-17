@@ -181,13 +181,29 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const agentPageSnapshot = {
+      draft_id: draft.id,
+      system_prompt: compiled.systemPrompt,
+      model: "gpt-4o",
+      temperature: 0.7,
+      tools: compiled.activeTools,
+      business_name: fields.businessName,
+      voice: {
+        provider: compiled.voice.provider,
+        voice_id: compiled.voice.voiceId,
+        speed: compiled.voice.speed,
+        language: compiled.voice.language,
+      },
+      compiled_at: compiled.compiledAt,
+    };
+
     const { data: version, error: versionError } = await admin
       .from("agent_config_versions")
       .insert({
         tenant_id: tenant.id,
         draft_id: draft.id,
         version: 1,
-        snapshot: compiled as unknown as Json,
+        snapshot: agentPageSnapshot as unknown as Json,
         published_by: internalUserId,
         published_at: new Date().toISOString(),
       })
