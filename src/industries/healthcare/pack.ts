@@ -1521,6 +1521,13 @@ export const healthcarePack: IndustryPack = {
           required: false,
           description: "Brief reason for the visit.",
         },
+        {
+          name: "patient_phone",
+          type: "string",
+          required: true,
+          description:
+            "Callback phone number for the patient — always ask for it before booking, the practice needs it to confirm or change the appointment.",
+        },
       ],
       returnType: "BookingConfirmation",
       requiresAuth: true,
@@ -1545,6 +1552,20 @@ export const healthcarePack: IndustryPack = {
           type: "string",
           required: false,
           description: "Reason for cancellation.",
+        },
+        {
+          name: "patient_name",
+          type: "string",
+          required: false,
+          description:
+            "Full name of the patient, used to find the appointment when the caller does not know an appointment ID (callers almost never do).",
+        },
+        {
+          name: "patient_phone",
+          type: "string",
+          required: false,
+          description:
+            "Patient's phone number, the most reliable way to find the appointment when no appointment ID is known.",
         },
       ],
       returnType: "CancellationResult",
@@ -1610,6 +1631,13 @@ export const healthcarePack: IndustryPack = {
           required: false,
           description: "ID of the target pharmacy.",
         },
+        {
+          name: "patient_phone",
+          type: "string",
+          required: true,
+          description:
+            "Callback phone number for the patient — the practice needs it to reach them about the refill.",
+        },
       ],
       returnType: "RefillRequestResult",
       requiresAuth: true,
@@ -1641,6 +1669,20 @@ export const healthcarePack: IndustryPack = {
           type: "string",
           required: false,
           description: "Group number from the insurance card.",
+        },
+        {
+          name: "patient_name",
+          type: "string",
+          required: true,
+          description:
+            "Full name of the patient the insurance belongs to — staff cannot match the intake to a patient without it.",
+        },
+        {
+          name: "patient_phone",
+          type: "string",
+          required: false,
+          description:
+            "Callback phone number, so staff can follow up once coverage has been confirmed.",
         },
       ],
       returnType: "InsuranceVerificationResult",

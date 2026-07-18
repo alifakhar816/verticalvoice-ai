@@ -23,6 +23,7 @@ import { createServerClient } from "@/lib/database/supabase-server";
 import { getCurrentTenantId } from "@/domain/tenants/current";
 import { getAgentConfig } from "@/domain/agents/service";
 import { LiveCallOrb } from "@/components/shared/live-call-orb";
+import { SystemPromptEditor } from "./system-prompt-editor";
 import type { Json } from "@/lib/database/types";
 
 interface AgentSnapshot {
@@ -412,29 +413,13 @@ export default async function AgentPage() {
             Policy &amp; Behavior
           </CardTitle>
           <CardDescription>
-            The compiled instructions and guardrails driving this agent&apos;s behavior on calls.
+            The instructions and guardrails driving this agent&apos;s behavior on calls.
+            Edit them here and save to publish a new version.
           </CardDescription>
         </CardHeader>
         <CardContent>
           {snapshot.system_prompt ? (
-            <div>
-              {/*
-                Plain checkbox + label toggle instead of native <details>/<summary>.
-                This needs no client-side JS (the page stays a Server Component),
-                and a <label htmlFor> click reliably toggles its checkbox in every
-                browser and automated click tool.
-              */}
-              <input type="checkbox" id="system-prompt-toggle" className="peer sr-only" />
-              <label
-                htmlFor="system-prompt-toggle"
-                className="inline-flex cursor-pointer select-none items-center gap-1 text-sm font-medium text-foreground underline-offset-4 hover:underline"
-              >
-                View full system prompt ({snapshot.system_prompt.length.toLocaleString()} characters)
-              </label>
-              <pre className="mt-3 hidden max-h-[32rem] overflow-auto whitespace-pre-wrap rounded-lg bg-muted p-4 font-mono text-xs leading-relaxed peer-checked:block">
-                {snapshot.system_prompt}
-              </pre>
-            </div>
+            <SystemPromptEditor initialPrompt={snapshot.system_prompt} />
           ) : (
             <p className="text-sm text-muted-foreground">
               No system prompt was captured in this config.

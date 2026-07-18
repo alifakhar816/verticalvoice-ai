@@ -707,6 +707,7 @@ const tools: ToolBinding[] = [
       { name: "urgency", type: "string", required: true, description: "Urgency level: emergency, urgent, or routine." },
       { name: "description", type: "string", required: true, description: "Detailed description of the issue." },
       { name: "permission_to_enter", type: "boolean", required: true, description: "Whether tenant grants entry permission." },
+      { name: "reporter_phone", type: "string", required: true, description: "Callback phone number for the tenant reporting the issue — maintenance cannot coordinate access or respond to an emergency without it." },
     ],
     returnType: "MaintenanceTicketConfirmation",
     requiresAuth: true,
