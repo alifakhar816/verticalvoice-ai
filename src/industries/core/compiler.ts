@@ -157,7 +157,7 @@ function buildTemplateVariables(
  * Anything still unresolved is dropped and the surrounding punctuation and
  * whitespace tidied, so the sentence still reads cleanly when spoken.
  */
-function stripUnresolvedPlaceholders(text: string): string {
+export function stripUnresolvedPlaceholders(text: string): string {
   return text
     .replace(/\{\{\s*[\w.]+\s*\}\}/g, "")
     .replace(/\ba\s+,/g, "a,")

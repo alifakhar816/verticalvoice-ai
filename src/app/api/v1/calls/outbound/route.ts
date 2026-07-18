@@ -10,6 +10,7 @@ import { z } from "zod";
 import { phoneSchema } from "@/lib/validation/schemas";
 import "@/industries";
 import { getIndustryPack } from "@/industries/core/registry";
+import { stripUnresolvedPlaceholders } from "@/industries/core/compiler";
 
 const outboundCallSchema = z.object({
   to_number: phoneSchema,
@@ -144,19 +145,45 @@ export async function POST(request: NextRequest) {
       .maybeSingle();
 
     let voiceId: string | null = null;
+    let compiledPrompt: string | null = null;
     if (activeConfig) {
       const { data: version } = await admin
         .from("agent_config_versions")
         .select("snapshot")
         .eq("id", activeConfig.agent_config_version_id)
         .single();
-      const snapshot = version?.snapshot as { voice?: { voice_id?: string } | null } | null;
+      const snapshot = version?.snapshot as {
+        system_prompt?: string;
+        voice?: { voice_id?: string } | null;
+      } | null;
       voiceId = snapshot?.voice?.voice_id ?? null;
+      compiledPrompt = snapshot?.system_prompt ?? null;
     }
 
     const businessName = businessProfile?.business_name ?? "the business";
-    const filledScript = fillTemplate(callType.promptTemplate, variables);
-    const baseSystemPrompt = `You are an AI phone assistant calling on behalf of ${businessName}. This is an outbound ${callType.category} call. ${filledScript} Speak naturally and conversationally, keep the call concise, and end politely. If the person asks to not be called again, acknowledge that respectfully and end the call.`;
+    // fillTemplate leaves `{{var}}` in place for absent optional variables, so
+    // strip the leftovers — otherwise the agent reads the literal braces aloud,
+    // the same defect the compiler was hardened against.
+    const filledScript = stripUnresolvedPlaceholders(
+      fillTemplate(callType.promptTemplate, variables),
+    );
+
+    // Outbound used to build its own throwaway prompt, which meant it inherited
+    // none of the compiled agent's identity or the shared voice rules (turn
+    // brevity, one question per turn, agent-owns-the-hangup). Only inbound got
+    // those. Layer the call's purpose on top of the compiled prompt instead, so
+    // both directions sound like the same person.
+    const outboundFraming = [
+      `THIS CALL: You are placing an outbound ${callType.category} call on behalf of ${businessName}. The person did not call you — you called them, so state who you are and why you are calling in your first sentence, then stop and let them respond.`,
+      filledScript,
+      `If they ask not to be called again, acknowledge it plainly, tell them you'll remove them, and end the call. Do not argue or re-pitch.`,
+    ]
+      .filter(Boolean)
+      .join("\n\n");
+
+    const baseSystemPrompt = compiledPrompt
+      ? `${compiledPrompt}\n\n${outboundFraming}`
+      : `You are the phone agent for ${businessName}.\n\n${outboundFraming}`;
     const systemPrompt = withCurrentDateContext(baseSystemPrompt, businessProfile?.timezone);
 
     // Insert the call row first (provider_call_id is nullable) so we have
@@ -199,14 +226,47 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const statusCallbackUrl = `${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/v1/webhooks/twilio`;
+    // Twilio rejects a relative StatusCallback, which would silently cost us
+    // every status transition for the call. Fail loudly at the source instead.
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL;
+    if (!appUrl?.startsWith("http")) {
+      await admin.from("calls").update({ status: "failed" }).eq("id", call.id);
+      return NextResponse.json(
+        { error: "NEXT_PUBLIC_APP_URL must be an absolute URL for call status callbacks." },
+        { status: 500 }
+      );
+    }
+    const statusCallbackUrl = `${appUrl}/api/v1/webhooks/twilio`;
 
-    const twilioCall = await placeOutboundCall({
-      to: to_number,
-      from: phoneNumber.number,
-      ultravoxJoinUrl: ultravoxCall.joinUrl,
-      statusCallbackUrl,
-    });
+    // A Twilio rejection (unverified caller ID, geo-permission, bad number)
+    // used to escape to the generic 500 handler, leaving the call row stuck in
+    // "initiating" forever and hiding Twilio's actual reason from the operator.
+    let twilioCall;
+    try {
+      twilioCall = await placeOutboundCall({
+        to: to_number,
+        from: phoneNumber.number,
+        ultravoxJoinUrl: ultravoxCall.joinUrl,
+        statusCallbackUrl,
+      });
+    } catch (err) {
+      const reason = err instanceof Error ? err.message : "Twilio call failed";
+      // `calls` has no failure-reason column, so the durable record of *why*
+      // goes to audit_events; the row itself just stops lying about being live.
+      await admin
+        .from("calls")
+        .update({ status: "failed", ended_at: new Date().toISOString() })
+        .eq("id", call.id);
+      await admin.from("audit_events").insert({
+        tenant_id,
+        actor_id: user.id,
+        action: "call.outbound_failed",
+        resource_type: "call",
+        resource_id: call.id,
+        metadata: { to_number, call_type_id, reason: reason.slice(0, 500) },
+      });
+      return NextResponse.json({ error: reason }, { status: 502 });
+    }
 
     await admin
       .from("calls")
