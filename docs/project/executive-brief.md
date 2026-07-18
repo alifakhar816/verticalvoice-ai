@@ -1,4 +1,4 @@
-# VerticalVoice AI — Executive Brief
+# VerticalVoice AI: Executive Brief
 
 A one-page summary of the project's problem statement, architecture, and
 current implementation status, intended as an entry point for the evaluation
@@ -6,8 +6,8 @@ panel before the technical appendix.
 
 ## The problem
 
-Three small-business categories — medical clinics, restaurants, real estate
-brokerages — all lose revenue to missed phone calls. A missed call means a
+Three small-business categories lose revenue to missed phone calls: medical
+clinics, restaurants, and real estate brokerages. A missed call means a
 missed appointment, a missed reservation, a missed lead. Each vertical needs
 a different call flow (HIPAA-safe scheduling vs. allergen-safe ordering vs.
 Fair-Housing-safe showings), which is why most AI receptionist products are
@@ -18,7 +18,7 @@ either shallow (one generic script bolted onto three industries) or narrow
 
 A pluggable **Industry Pack architecture**: one platform, one deterministic
 **Vertical Agent Compiler** (`src/industries/core/compiler.ts`), and three
-self-contained packs — Healthcare, Restaurant, Real Estate — that each
+self-contained packs (Healthcare, Restaurant, Real Estate) that each
 implement the same `IndustryPack` interface
 (`src/industries/core/industry-pack.ts`) with their own intents, tools,
 compliance policies, and dashboards. The compiler takes a tenant's config and
@@ -27,13 +27,13 @@ drives the live call.
 
 ## The two distinguishing contributions
 
-- **5–10 minute setup.** A new tenant fills out the pack's onboarding schema
-  (business info, hours, appointment types, menu, listings — whatever the
+- **5 to 10 minute setup.** A new tenant fills out the pack's onboarding schema
+  (business info, hours, appointment types, menu, listings, whatever the
   vertical needs) and the compiler generates a working agent: system prompt,
   active intents, active tools, active policies, greeting. No manual prompt
   engineering per customer.
 - **Industry depth, not industry veneer.** Compliance isn't a system-prompt
-  instruction the model can be talked out of — it's a deterministic policy
+  instruction the model can be talked out of. It's a deterministic policy
   engine (`src/industries/core/policies.ts`) enforced by the tool gateway
   before any tool executes. HIPAA verification, Fair Housing steering
   refusal, and allergen non-guarantee are all testable, auditable rules, not
@@ -59,8 +59,8 @@ for the dashboard.
 
 ## Summary
 
-The project's central claim is architectural rather than demonstrative: this
-is not three voice demos, but one vertical-agent operating system on which
-Sunrise Medical, Bellas Italian, and Metro Realty run as three tenants. The
+The project's central claim is architectural rather than demonstrative. This
+is one vertical-agent operating system, not three voice demos, and
+Sunrise Medical, Bellas Italian, and Metro Realty run on it as three tenants. The
 test of that claim is that adding a fourth vertical is a configuration and
 pack-authoring exercise, not a rewrite of the platform.

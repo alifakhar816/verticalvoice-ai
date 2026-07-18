@@ -52,6 +52,6 @@ body:
     id: additional-context
     attributes:
       label: Additional context
-      description: Anything else — links, mockups, related issues.
+      description: Anything else, such as links, mockups, or related issues.
     validations:
       required: false

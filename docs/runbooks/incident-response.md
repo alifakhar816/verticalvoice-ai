@@ -10,16 +10,16 @@ today (no on-call rotation, no paid incident tooling, etc).
 
 ## General incident flow
 
-1. **Detect** — via provider status pages, error logs (`logger.error` entries
+1. **Detect** via provider status pages, error logs (`logger.error` entries
    are structured JSON, see `src/lib/observability/logger.ts`), Supabase
    dashboard alerts, or a user report.
-2. **Triage** — is this affecting all tenants or one? Is it a hard outage or
+2. **Triage.** Is this affecting all tenants or one? Is it a hard outage or
    degraded service? Check `docs/runbooks/backup-restore.md` if data
    integrity is in question.
-3. **Mitigate** — see the specific playbooks below.
-4. **Communicate** — notify affected tenants if the incident is customer-visible
+3. **Mitigate** using the specific playbooks below.
+4. **Communicate.** Notify affected tenants if the incident is customer-visible
    and expected to last more than a few minutes.
-5. **Resolve & document** — once fixed, write a short postmortem: what
+5. **Resolve & document.** Once fixed, write a short postmortem: what
    happened, blast radius, root cause, and the follow-up fix.
 
 ---
@@ -36,16 +36,16 @@ given `provider_call_id` (initiated/ringing but never progresses).
    - Twilio: https://status.twilio.com
    - Telnyx: https://status.telnyx.com
    - Ultravox: check their status/support channel (no public status page
-     confirmed at time of writing — see known-limitations.md)
+     confirmed at time of writing, see known-limitations.md)
 2. Confirm it's the provider and not us: check recent deploys, check
    `dead_letter_events` (via `listPendingDeadLetters` in
    `src/lib/jobs/dead-letter.ts`) for a spike in `webhook:twilio` /
-   `webhook:telnyx` / `webhook:ultravox` entries — a spike there means our
+   `webhook:telnyx` / `webhook:ultravox` entries. A spike there means our
    webhook handlers are failing, which could be us, not them.
 3. If it's a genuine provider outage:
    - There is currently **no automatic failover** between telephony
-     providers (VerticalVoice AI is single-provider per tenant today — see
-     known-limitations.md). Inbound calls to the affected provider's numbers
+     providers, because VerticalVoice AI is single-provider per tenant today
+     (see known-limitations.md). Inbound calls to the affected provider's numbers
      will fail until the provider recovers.
    - Post a status update if you have a status page / customer channel.
    - Once the provider recovers, replay any dead-lettered webhook events:
@@ -70,7 +70,7 @@ shows high CPU/connections, or the Supabase status page shows an incident.
 2. Check the project's own health in the Supabase dashboard (Database →
    Reports) for connection count, slow queries, and disk usage.
 3. If it's a genuine Supabase platform outage: there's nothing to do but
-   wait and monitor — Supabase Cloud is a managed dependency. Communicate to
+   wait and monitor. Supabase Cloud is a managed dependency. Communicate to
    users if the outage is prolonged.
 4. If it's connection exhaustion from our side (e.g. a runaway loop calling
    `createServerClient()` per-request without pooling issues, or a stuck
@@ -97,27 +97,27 @@ load from `audit_events`/`calls` writes, or repeated identical events.
 
 1. All three webhook routes (`src/app/api/v1/webhooks/{twilio,ultravox,telnyx}/route.ts`)
    already have:
-   - **Signature validation** (HMAC, see `src/lib/webhooks/signature.ts`) —
-     rules out unauthenticated flooding from being processed (invalid
-     signatures return 401 immediately, cheaply).
-   - **Idempotency checks** against `audit_events` (same `resource_id` +
-     `action` is a no-op) — rules out duplicate-delivery floods from doing
-     real work twice.
+   - **Signature validation** (HMAC, see `src/lib/webhooks/signature.ts`),
+     which stops unauthenticated flooding from being processed. Invalid
+     signatures return 401 immediately, cheaply.
+   - **Idempotency checks** against `audit_events`, where the same
+     `resource_id` + `action` is a no-op. This stops duplicate-delivery
+     floods from doing real work twice.
    - **Retry + dead-letter wiring** (`src/lib/jobs/retry.ts` /
-     `src/lib/jobs/dead-letter.ts`) — a burst of failures durably queues
+     `src/lib/jobs/dead-letter.ts`), so a burst of failures durably queues
      instead of hammering the DB with unbounded retries.
 2. Webhook routes are intentionally **excluded** from the proxy-level rate
-   limiter (`src/proxy.ts` — provider-authenticated, and providers may
-   legitimately burst-deliver many events after their own outage). If a
-   flood is coming from an unauthenticated/spoofed source, the signature
-   check rejects it before any DB write — confirm the webhook secret env
-   vars (`TWILIO_AUTH_TOKEN`, `ULTRAVOX_WEBHOOK_SECRET`,
-   `TELNYX_WEBHOOK_SECRET`) are set in production; if unset, the routes fall
+   limiter (`src/proxy.ts`), because they are provider-authenticated and
+   providers may legitimately burst-deliver many events after their own
+   outage. If a flood is coming from an unauthenticated/spoofed source, the
+   signature check rejects it before any DB write. Confirm the webhook secret
+   env vars (`TWILIO_AUTH_TOKEN`, `ULTRAVOX_WEBHOOK_SECRET`,
+   `TELNYX_WEBHOOK_SECRET`) are set in production. If unset, the routes fall
    back to a **skip-validation warning** (dev-mode behavior) which is unsafe
-   in production — this is the first thing to check.
+   in production, so this is the first thing to check.
 3. If a specific IP/source is clearly abusive and signature validation
    somehow isn't stopping it, block at the infra layer (hosting
-   provider/CDN firewall) — the app itself has no IP-blocklist mechanism.
+   provider/CDN firewall). The app itself has no IP-blocklist mechanism.
 4. If the flood is legitimate (e.g. provider replaying a large backlog after
    their own outage), let idempotency absorb it; monitor DB load and scale
    Supabase compute if needed.
@@ -132,16 +132,16 @@ load from `audit_events`/`calls` writes, or repeated identical events.
    role key, provider API key, webhook secret) is suspected compromised,
    rotate it immediately in the provider dashboard and redeploy with the
    new value.
-2. Check `audit_events` for the affected tenant(s) — every tool call,
+2. Check `audit_events` for the affected tenant(s). Every tool call,
    privacy export/delete, and webhook event is logged there
    (`src/lib/tools/gateway.ts` step 10, `src/app/api/v1/privacy/*`). Look for
    unexpected `privacy_export` / `privacy_delete_*` actions or tool calls
    from unfamiliar `actor_id`s.
 3. Identify scope: which tenant(s), which tables, what data (PII/PHI risk
-   depends on industry — healthcare tenants may hold patient data, see
+   depends on industry, since healthcare tenants may hold patient data, see
    `docs/compliance/known-limitations.md` on HIPAA/BAA status).
-4. If confirmed, this is a legal/compliance event, not just an engineering
-   one — VerticalVoice AI does not currently have a formal breach
+4. If confirmed, treat this as a legal/compliance event and not only an
+   engineering one. VerticalVoice AI does not currently have a formal breach
    notification process or legal counsel on retainer (see
    `docs/compliance/known-limitations.md`). Escalate to whoever owns that decision before
    any external communication.
@@ -168,15 +168,15 @@ known-good version:
    { "tenant_id": "<uuid>", "version_id": "<uuid>" }
    ```
    (see `src/app/api/v1/agents/[id]/rollback/route.ts`). This requires the
-   caller to be an authenticated member of the tenant — it verifies
+   caller to be an authenticated member of the tenant. It verifies
    membership and that the target version belongs to the same agent before
    applying it.
-4. Verify the rollback took effect — re-fetch the agent
+4. Verify the rollback took effect by re-fetching the agent
    (`GET /api/v1/agents/[id]`) and confirm the active config hash matches
    the target version's `config_hash`.
 5. If the agent was mid-compile or mid-activation when the incident
    started, also check `/api/v1/agents/[id]/compile` and
-   `/api/v1/agents/[id]/activate` — a rollback resets the config but does
+   `/api/v1/agents/[id]/activate`. A rollback resets the config but does
    not automatically re-run compile/activate; re-run those if the rolled
    back version needs to be re-activated for live calls.
 
@@ -184,6 +184,6 @@ known-good version:
 
 There is no automated blue/green deploy or canary system documented in this
 repo today. A bad deploy should be rolled back via your hosting platform's
-standard "redeploy previous build" mechanism (document your specific
-platform's steps here once production hosting is finalized — see
+standard "redeploy previous build" mechanism. Document your specific
+platform's steps here once production hosting is finalized (see
 `docs/compliance/known-limitations.md`).

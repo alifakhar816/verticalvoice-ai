@@ -2,8 +2,8 @@
 
 An honest, current list of what VerticalVoice AI does **not** yet have in
 place, so nobody (internally or externally) assumes production-grade
-guarantees that don't exist. Update this file as gaps are closed — don't
-let it go stale.
+guarantees that don't exist. Update this file as gaps are closed. Don't let
+it go stale.
 
 ## Compliance & legal
 
@@ -17,8 +17,8 @@ let it go stale.
 - **No PCI DSS scope assessment for restaurant ordering.** The restaurant
   vertical handles payment-adjacent order data and integrates with POS
   providers (`src/integrations/pos/`). The platform is designed so that card
-  data is never spoken to, captured by, or stored in the agent — payment
-  capture is delegated to the POS/payment provider — but that boundary has
+  data is never spoken to, captured by, or stored in the agent, with payment
+  capture delegated to the POS/payment provider. That boundary has
   **not been formally assessed or attested against PCI DSS**. Do not enable
   any flow that would have a caller read card details to the agent, and do
   not claim PCI compliance until a scope assessment is complete.
@@ -34,7 +34,7 @@ let it go stale.
 - **No call-recording consent matrix per vertical.** All three verticals
   record and transcribe calls, but consent requirements differ by
   jurisdiction (one-party vs. two-party states) and by the sensitivity of
-  the data involved — patient health details, payment-adjacent order data,
+  the data involved. Patient health details, payment-adjacent order data,
   and housing-inquiry data each carry different exposure. See the
   *Consent & telephony* section below; there is no per-vertical, per-region
   consent configuration yet.
@@ -43,7 +43,7 @@ let it go stale.
   breach-notification playbook (timelines, required disclosures per
   jurisdiction) or retained counsel for this.
 - **Privacy policy is an outline, not a published policy.** See
-  `docs/compliance/privacy-policy-outline.md` — it is explicitly a
+  `docs/compliance/privacy-policy-outline.md`. It is explicitly a
   structural checklist for counsel, not a document that should be shown to
   end users as-is.
 - **No confirmed SOC 2 / ISO 27001 / other certifications.** Don't claim
@@ -86,54 +86,54 @@ let it go stale.
   in place before onboarding real tenants.
 - **No load testing performed at scale.** The rate limiter
   (`src/lib/security/rate-limit.ts`) and tool gateway rate limits
-  (`src/lib/tools/gateway.ts`) are in-memory, per-process — untested under
+  (`src/lib/tools/gateway.ts`) are in-memory and per-process, untested under
   concurrent multi-instance load or high call volume. No load/stress
   testing has been run against realistic concurrent-call volumes, webhook
   burst rates, or database connection limits under load.
 - **In-memory rate limiting is per-instance, not shared.** If the app is
   horizontally scaled across multiple Node.js instances, each instance
-  enforces its own rate-limit counters independently — the effective limit
+  enforces its own rate-limit counters independently, so the effective limit
   across the fleet is `limit × instance count`, not `limit`. Fine at
   current scale; would need a shared store (e.g. Redis) to enforce a true
   global limit once horizontally scaled.
 - **Idempotency cache in `src/lib/tools/gateway.ts` is also in-memory and
-  per-process** — a retried request routed to a different instance won't
+  per-process.** A retried request routed to a different instance won't
   see the cached result. Same caveat as rate limiting.
 - **No confirmed production hosting/deployment pipeline documented in this
   repo.** `docs/runbooks/incident-response.md` § "General rollback" flags
-  this explicitly — there's no automated blue/green or canary deploy
+  this explicitly. There's no automated blue/green or canary deploy
   process captured here.
 - **Backup/restore has a documented drill procedure
   (`docs/runbooks/backup-restore.md`) but the drill has not necessarily
-  been run yet.** An untested backup is not a verified backup — run the
+  been run yet.** An untested backup is not a verified backup. Run the
   drill before relying on it during a real incident.
 
 ## Application-level gaps
 
 - **Telnyx webhook signature verification is incomplete.** Per the `TODO`
   comment in `src/app/api/v1/webhooks/telnyx/route.ts`, full Ed25519
-  signature verification isn't implemented — only timestamp freshness is
+  signature verification isn't implemented; only timestamp freshness is
   checked when `TELNYX_WEBHOOK_SECRET` is set. This is weaker than the
   HMAC verification used for Twilio/Ultravox.
 - **Webhook `calls` upserts don't set `tenant_id`.** The Twilio/Telnyx/
   Ultravox webhook handlers upsert into `calls` keyed by
-  `provider_call_id` without setting `tenant_id` on the insert path — this
+  `provider_call_id` without setting `tenant_id` on the insert path. This
   means dead-letter tenant resolution (see
   `docs/runbooks/incident-response.md`) depends on a prior write having
-  set it, and is a gap worth closing (calls should be tenant-scoped from
-  creation, e.g. via the phone number → tenant mapping in `phone_numbers`).
+  set it, and is a gap worth closing. Calls should be tenant-scoped from
+  creation, e.g. via the phone number → tenant mapping in `phone_numbers`.
 - **Dead letter queue requires a resolvable `tenant_id` to record a
   failure.** If a webhook fails before any `calls` row exists for that
   `provider_call_id` (so tenant lookup fails), the failure is logged via
-  `logger.error` only — it is not durably queued and will not show up in
+  `logger.error` only. It is not durably queued and will not show up in
   `dead_letter_events` for later replay. See `src/lib/jobs/dead-letter.ts`
   and the webhook route `catch` blocks.
 - **No automated accessibility test suite.** The accessibility fixes in
   this pass (`src/app/(marketing)/page.tsx`, `src/app/(auth)/login/page.tsx`,
   `src/app/dashboard/overview/page.tsx`, `src/components/shared/app-sidebar.tsx`,
   `src/components/marketing/header.tsx`) were manual/targeted, covering
-  only those files — not a full WCAG audit of all ~60+ pages, and not
-  backed by an automated a11y linter/CI check.
+  only those files. They are not a full WCAG audit of all ~60+ pages, and
+  are not backed by an automated a11y linter/CI check.
 - **Rollback runbook covers agent-config rollback, not infrastructure
   rollback.** `POST /api/v1/agents/[id]/rollback` reverts a tenant's agent
   configuration; it does not roll back application code deploys, database

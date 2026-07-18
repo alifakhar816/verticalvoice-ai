@@ -1,4 +1,4 @@
-# Privacy Policy — Structural Outline
+# Privacy Policy: Structural Outline
 
 **This is not legal advice and is not a publishable privacy policy.** It is
 a structural checklist of what a real privacy policy needs to cover for
@@ -9,13 +9,13 @@ especially given the multi-vertical (healthcare/restaurant/real-estate)
 and multi-jurisdiction nature of the product.
 
 See `docs/compliance/known-limitations.md` for what's honestly *not* in
-place yet (e.g. no signed HIPAA BAAs) — the published policy must not claim
+place yet, such as signed HIPAA BAAs. The published policy must not claim
 protections that don't actually exist.
 
 ## 1. Who this policy covers
 
-- VerticalVoice AI as the platform operator (data controller/processor
-  distinction matters — see section 8).
+- VerticalVoice AI as the platform operator. The data
+  controller/processor distinction matters here; see section 8.
 - Each **tenant** (the business using VerticalVoice AI) as a separate data
   controller for their own end-customers' data (callers, patients, diners,
   leads). VerticalVoice AI acts as a data **processor** on the tenant's
@@ -32,21 +32,21 @@ Map directly to what the schema actually stores
   (admin/user emails, names).
 - **Call data**: `calls` (caller/called numbers, duration, recording URL),
   `call_transcripts` (full transcript content, `is_redacted` flag).
-- **Industry-specific data**: `appointments` (patient name/phone/DOB/reason
-  — healthcare), `reservations`/`orders` (guest name/phone/email —
-  restaurant), `real_estate_leads` (name/phone/email/budget/preferences —
-  real estate).
+- **Industry-specific data**: `appointments` (healthcare: patient
+  name/phone/DOB/reason), `reservations`/`orders` (restaurant: guest
+  name/phone/email), `real_estate_leads` (real estate:
+  name/phone/email/budget/preferences).
 - **Usage/billing data**: `usage_ledger`, `usage_limits`.
-- **Audit/operational data**: `audit_events` (who did what, when — includes
-  actor IDs and metadata).
+- **Audit/operational data**: `audit_events`, recording who did what and
+  when, including actor IDs and metadata.
 
 ## 3. How data is collected
 
 - Directly from tenant admins (signup, business profile setup).
 - From end-customers via phone calls handled by the AI agent (voice →
   transcript → structured data extraction into appointments/orders/leads).
-- From telephony/voice providers via webhooks (Twilio, Telnyx, Ultravox —
-  see `src/app/api/v1/webhooks/`).
+- From telephony/voice providers via webhooks (Twilio, Telnyx, Ultravox).
+  See `src/app/api/v1/webhooks/`.
 
 ## 4. Legal basis for processing
 
@@ -59,7 +59,7 @@ recording, where required by two-party-consent states/countries).
 **Known gap:** recording consent is a policy setting
 (`policy_settings.recording_consent_required`) but the actual runtime
 enforcement of two-party consent laws by caller jurisdiction is not fully
-built — see `known-limitations.md`.
+built. See `known-limitations.md`.
 
 ## 5. How data is used
 
@@ -68,15 +68,15 @@ built — see `known-limitations.md`.
 - Tool execution and policy enforcement (`src/lib/tools/gateway.ts`).
 - Usage-based billing (`src/domain/usage/service.ts`).
 - Product analytics and audit logging.
-- **Not** used for: third-party advertising, sale of personal data (state
-  this explicitly if true — verify against actual practice before
-  publishing).
+- **Not** used for: third-party advertising, sale of personal data. State
+  this explicitly if it is true, and verify against actual practice before
+  publishing.
 
 ## 6. Data retention
 
 - Needs an explicit, documented retention period per data category (call
   recordings, transcripts, PII in appointments/leads). Currently **no
-  automated retention/expiry job exists** in this codebase — see
+  automated retention/expiry job exists** in this codebase. See
   `known-limitations.md`. This must either be built or the policy must
   accurately describe indefinite retention until deletion is requested.
 - Dead-lettered events (`dead_letter_events`) and audit logs
@@ -88,12 +88,12 @@ This is the section directly backed by shipped functionality:
 
 - **Right to access / data portability**: `POST /api/v1/privacy/export`
   (`src/app/api/v1/privacy/export/route.ts`, backed by
-  `exportTenantData` in `src/domain/privacy/service.ts`) — returns a JSON
+  `exportTenantData` in `src/domain/privacy/service.ts`). It returns a JSON
   bundle of all tenant-scoped data (business profile, calls, transcripts,
   appointments/reservations/orders/leads depending on industry).
 - **Right to deletion/erasure**: `POST /api/v1/privacy/delete`
-  (`src/app/api/v1/privacy/delete/route.ts`, backed by `deleteTenantData`)
-  — supports `mode: "soft"` (tenant marked deleted, data retained for a
+  (`src/app/api/v1/privacy/delete/route.ts`, backed by `deleteTenantData`).
+  It supports `mode: "soft"` (tenant marked deleted, data retained for a
   recovery window) and `mode: "hard"` (irreversible purge of tenant-scoped
   tables). Requires explicit `confirm: true` and admin/owner role; logged to
   `audit_events`.
@@ -102,8 +102,8 @@ This is the section directly backed by shipped functionality:
   level (e.g. a single caller/patient requesting their own data be
   deleted). A real privacy policy serving individual data subject requests
   (a single patient asking "delete my records") needs a
-  narrower-scoped deletion path that this codebase does not yet have —
-  flag this explicitly as a gap, don't imply per-individual self-service
+  narrower-scoped deletion path that this codebase does not yet have. Flag
+  this explicitly as a gap, and don't imply per-individual self-service
   exists today.
 - The policy should state the process/timeline for a tenant or end-user to
   request export/deletion (who to contact, expected turnaround), since
@@ -118,8 +118,8 @@ List every third party that touches tenant/caller data:
 - Telephony/voice providers: Twilio, Telnyx, Ultravox (call audio,
   metadata, transcripts pass through these).
 - Any AI/LLM providers used for transcript processing or voice generation
-  (confirm exact providers and whether they retain data for training —
-  this is a common gap; verify contractually before publishing a claim).
+  (confirm exact providers and whether they retain data for training).
+  This is a common gap; verify contractually before publishing a claim.
 - Hosting provider.
 
 ## 9. Security measures (high level, not implementation detail)
@@ -128,7 +128,7 @@ Reference the *existence* of controls without over-promising:
 
 - Webhook signature verification, tenant isolation, role-based access,
   audit logging, rate limiting. Do not claim SOC 2 / ISO 27001 / specific
-  certifications unless actually obtained — see `known-limitations.md`.
+  certifications unless actually obtained. See `known-limitations.md`.
 
 ## 10. Vertical-specific considerations
 
@@ -154,7 +154,7 @@ never be described to end users as providing clinical advice.
 
 The restaurant pack handles order and reservation data and integrates with
 POS providers. The policy must state plainly that **card/payment details are
-not collected, spoken to, or stored by the voice agent** — payment capture is
+not collected, spoken to, or stored by the voice agent**. Payment capture is
 delegated to the POS or payment provider, whose own privacy terms then apply.
 Per `known-limitations.md`, no PCI DSS scope assessment has been performed,
 so no PCI compliance claim may appear in the policy.
@@ -166,9 +166,9 @@ should disclose that this information is recorded with the order.
 
 ### 10c. Real estate (Fair Housing)
 
-The real estate pack processes housing-inquiry data — budget, desired
-location, household requirements, showing history — which is regulated
-differently from the other two verticals. The governing constraint is
+The real estate pack processes housing-inquiry data: budget, desired
+location, household requirements, and showing history. That data is
+regulated differently from the other two verticals. The governing constraint is
 anti-discrimination rather than confidentiality: the agent enforces a
 `fair_housing` policy refusing to steer on protected characteristics, and it
 must not record or act on inferences about a caller's protected class.
@@ -188,12 +188,12 @@ State whether the service is intended for use where callers may be minors
 
 Depends on where Supabase project region + telephony providers process
 data vs. where tenants/callers are located. Needs a stated mechanism
-(SCCs, adequacy decisions, etc.) if data crosses borders — verify actual
+(SCCs, adequacy decisions, etc.) if data crosses borders. Verify the actual
 infrastructure region before drafting this section.
 
 ## 13. Changes to this policy & contact information
 
-Standard boilerplate — version history, effective date, and a real contact
+Standard boilerplate: version history, effective date, and a real contact
 channel for privacy requests (should route to whoever owns triggering the
 export/delete endpoints above, since there's no self-service UI yet).
 

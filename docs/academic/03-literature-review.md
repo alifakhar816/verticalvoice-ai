@@ -18,11 +18,11 @@ Within VerticalVoice AI, intent recognition is handled by Ultravox, a commercial
 
 ### 1.2 Voice Agents and Real-Time Constraints
 
-Voice-based dialogue introduces latency constraints that text-based conversation does not face. Callers tolerate far less delay than users of text interfaces, and deployments of spoken dialogue systems to real telephone users have consistently found responsiveness and robustness to be dominant factors in usability [15]. The specific thresholds sometimes quoted in industry writing, such as a 1.5-second expectation and a 2–3 second noticeability floor, are not sourced here and should not be treated as established findings; tracking dialogue state accurately across turns is itself a recognised open research problem [14].
+Voice-based dialogue introduces latency constraints that text-based conversation does not face. Callers tolerate far less delay than users of text interfaces, and deployments of spoken dialogue systems to real telephone users have consistently found responsiveness and robustness to be dominant factors in usability [15]. The specific thresholds sometimes quoted in industry writing, such as a 1.5-second expectation and a 2-3 second noticeability floor, are not sourced here and should not be treated as established findings; tracking dialogue state accurately across turns is itself a recognised open research problem [14].
 
 Cascaded architectures (STT → NLU → TTS) accumulate latency across stages. End-to-end systems that jointly optimize speech-to-response latency are an emerging area. Ultravox employs a streaming architecture to minimize latency.
 
-In VerticalVoice AI, the delay between call bridge and intent is informally estimated at 1–2 seconds. This estimate comes from impressions during manual test calls; it has not been measured. No timing instrumentation exists on the bridge path and no percentile has been computed from call data, so the figure should be treated as an unverified approximation rather than a result. Establishing a measured P50/P95 baseline is outstanding work, and this trade-off is documented as a limitation.
+In VerticalVoice AI, the delay between call bridge and intent is informally estimated at 1-2 seconds. This estimate comes from impressions during manual test calls; it has not been measured. No timing instrumentation exists on the bridge path and no percentile has been computed from call data, so the figure should be treated as an unverified approximation rather than a result. Establishing a measured P50/P95 baseline is outstanding work, and this trade-off is documented as a limitation.
 
 ### 1.3 Domain-Specific Adaptation
 

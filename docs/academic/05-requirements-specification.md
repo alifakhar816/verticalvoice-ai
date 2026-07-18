@@ -154,7 +154,7 @@ This document derives functional and non-functional requirements from the implem
 
 ---
 
-> **Note on FR-11.1 (availability) and operating hours.** Operating hours are configurable and persisted: `api/v1/settings/operating-hours` reads and replaces rows in the `operating_hours` table. However, no code path enforces them against booking. `checkAvailability` in `src/domain/scheduling/service.ts` hardcodes a 09:00–17:00 window for every tenant, never reads the `operating_hours` table, and currently has no callers anywhere in `src/`. `bookAppointment` checks only for overlap with existing appointments, so a booking outside a tenant's configured hours is not rejected. Availability is therefore stored but not enforced, and this is a known gap rather than a completed requirement.
+> **Note on FR-11.1 (availability) and operating hours.** Operating hours are configurable and persisted: `api/v1/settings/operating-hours` reads and replaces rows in the `operating_hours` table. However, no code path enforces them against booking. `checkAvailability` in `src/domain/scheduling/service.ts` hardcodes a 09:00-17:00 window for every tenant, never reads the `operating_hours` table, and currently has no callers anywhere in `src/`. `bookAppointment` checks only for overlap with existing appointments, so a booking outside a tenant's configured hours is not rejected. Availability is therefore stored but not enforced, and this is a known gap rather than a completed requirement.
 
 ---
 
@@ -184,19 +184,19 @@ The table below is derived directly from the requirement identifiers listed abov
 
 | Module | Requirements | Automated test file(s) | Otherwise verified by |
 |---|---|---|---|
-| FR-1 Tenant Management | 3 | — | Manual walkthrough |
+| FR-1 Tenant Management | 3 | none | Manual walkthrough |
 | FR-2 Authentication and Authorization | 5 | `token.test.ts` (call tokens only) | Manual walkthrough |
 | FR-3 Agent Configuration and Versioning | 8 | `compiler.test.ts` (compilation only) | Manual walkthrough |
 | FR-4 Inbound Call Handling | 7 | `rls.test.ts`, `scenarios.test.ts` | Live test calls |
 | FR-5 Tool Execution | 4 | `tool-gateway.test.ts` | Live test calls |
-| FR-6 Knowledge Management | 6 | — | Manual walkthrough |
+| FR-6 Knowledge Management | 6 | none | Manual walkthrough |
 | FR-7 Outbound Calling | 5 | `policies.test.ts` (DNC only) | Live test calls |
-| FR-8 Compliance and Privacy | 6 | `policies.test.ts`, `redaction.test.ts`, `fair-housing.test.ts` | — |
-| FR-9 Analytics and Reporting | 4 | — | Manual walkthrough |
-| FR-10 Test Center | 5 | — | Manual walkthrough |
-| FR-11 Integrations | 5 | — | Manual walkthrough |
+| FR-8 Compliance and Privacy | 6 | `policies.test.ts`, `redaction.test.ts`, `fair-housing.test.ts` | n/a (fully automated) |
+| FR-9 Analytics and Reporting | 4 | none | Manual walkthrough |
+| FR-10 Test Center | 5 | none | Manual walkthrough |
+| FR-11 Integrations | 5 | none | Manual walkthrough |
 | FR-12 Industry-Specific Features | 16 | `scenarios.test.ts`, `fair-housing.test.ts` (partial) | Manual walkthrough |
-| **TOTAL** | **74** | 9 test files across 8 modules | — |
+| **TOTAL** | **74** | 9 test files across 8 modules | n/a |
 
 Five of the twelve modules (Tenant Management, Knowledge Management, Analytics, Test Center, Integrations) have no automated tests at all. Where a test file is listed, it exercises part of the module, not every requirement in it.
 

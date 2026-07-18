@@ -7,7 +7,7 @@ body:
     attributes:
       value: |
         Thanks for filing a bug. Voice/telephony bugs are hard to reproduce
-        from a description alone — filling in the vertical, provider mode,
+        from a description alone. Filling in the vertical, provider mode,
         and call ID below usually gets us to a fix much faster.
 
   - type: dropdown
@@ -32,10 +32,10 @@ body:
         or live providers (real Twilio/Telnyx/Ultravox/Retell)?
       options:
         - "Mock (VOICE_PROVIDER=mock / TELEPHONY_PROVIDER=mock)"
-        - "Live — Twilio"
-        - "Live — Telnyx"
-        - "Live — Ultravox"
-        - "Live — Retell"
+        - "Live: Twilio"
+        - "Live: Telnyx"
+        - "Live: Ultravox"
+        - "Live: Retell"
         - Not applicable / not a call-related bug
     validations:
       required: true
@@ -47,7 +47,7 @@ body:
       description: >
         The call's ID/UUID from the dashboard's Call History or Call Detail
         page, if this bug is about a specific call. Leave blank if not
-        applicable — do not paste raw transcripts or PII here.
+        applicable. Do not paste raw transcripts or PII here.
       placeholder: e.g. 3f9c1a2e-... or the id shown in Call Detail
     validations:
       required: false

@@ -1,8 +1,8 @@
-# VerticalVoice AI — Post-FYP Roadmap
+# VerticalVoice AI: Post-FYP Roadmap
 
 An honest accounting of what this platform is today (a working, evaluated,
 mock-provider-capable architecture) versus what it needs before it could take
-real calls from real businesses. Nothing below is understated — a reviewer or
+real calls from real businesses. Nothing below is understated. A reviewer or
 future contributor should be able to use this as a punch list.
 
 ## 1. Real Twilio / Ultravox account activation
@@ -13,7 +13,7 @@ future contributor should be able to use this as a punch list.
   configuration via `configureInboundRoute`) and a funded Ultravox account
   (agent creation via `createAgent`).
 - The provider abstraction (`VoiceRuntimeProvider`, `TelephonyProvider`)
-  means this is a credentials-and-config change, not a rewrite — but it is
+  means this is a credentials-and-config change, not a rewrite. It is still
   the single largest gap between "demo-ready" and "call-ready."
 - Webhook signature verification (`src/lib/webhooks/signature.ts`) needs to
   be validated against real Twilio/Ultravox signing secrets in a live
@@ -22,8 +22,8 @@ future contributor should be able to use this as a punch list.
 ## 2. Real PHI compliance review (BAAs)
 
 - `phi_mode` in `src/config/features.ts` is explicitly hardcoded to `false`
-  with the comment "PHI mode is never enabled via env — requires code
-  change." That's a deliberate guardrail: the platform should not carry real
+  with the comment `PHI mode is never enabled via env — requires code change`.
+  That's a deliberate guardrail: the platform should not carry real
   Protected Health Information until a formal review has happened.
 - Before Sunrise-Medical-Clinic-shaped tenants can handle real patient data,
   this needs: a signed Business Associate Agreement (BAA) with Supabase (or
@@ -39,7 +39,7 @@ future contributor should be able to use this as a punch list.
 ## 3. Load testing
 
 - The 140-scenario evaluation suite (`src/tests/scenarios`) validates
-  correctness — intent accuracy, policy compliance, tool correctness — but
+  correctness (intent accuracy, policy compliance, tool correctness) but
   not throughput. There is no current load test exercising concurrent calls
   against the tool gateway, the idempotency cache (in-memory `Map`, not yet
   distributed), or RLS query performance at realistic tenant/call-volume
@@ -54,7 +54,7 @@ future contributor should be able to use this as a punch list.
 
 - **EHR/FHIR**: the healthcare pack's `ehr_system` onboarding field
   (`src/industries/healthcare/pack.ts`) exists as a schema slot but there is
-  no FHIR client implementation yet — real patient lookup / insurance
+  no FHIR client implementation yet. Real patient lookup and insurance
   verification against a live EHR is future work, not present capability.
 - **Follow Up Boss** (real estate CRM): the real-estate pack currently
   targets HubSpot for CRM lead sync (per `docs/architecture/INVENTORY.md`).
@@ -70,7 +70,7 @@ future contributor should be able to use this as a punch list.
 
 - `outbound_calling` is a feature flag (default `false`) in
   `src/config/features.ts`, and `real_estate_outbound` similarly defaults
-  off — outbound calling is deliberately not live.
+  off. Outbound calling is deliberately not live.
 - The schema already has the building blocks for doing this safely:
   `consent_records`, `consent_versions`, `dnc_checks` (Do-Not-Call registry
   checks), `suppression_entries`, and `outbound_attempts` tables exist in
@@ -92,5 +92,5 @@ non-PHI vertical (restaurant is the lowest-regulatory-risk starting point),
 (2) load testing that pilot traffic, (3) the healthcare PHI/BAA review in
 parallel once inbound is proven stable, (4) the additional integrations as
 pilot tenants request them, and (5) outbound calling last, only after the
-consent/suppression enforcement logic has been built and reviewed — not
+consent/suppression enforcement logic has been built and reviewed, not
 merely scaffolded in the schema.

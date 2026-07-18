@@ -20,7 +20,7 @@ The solution is a multi-tenant AI voice agent platform that automates first-poin
 - Administrative staff spend significant time on repetitive call-handling instead of higher-value work
 - After-hours calls generate voicemail backlogs that delay patient resolution
 
-**Staffing Challenge**: Small to mid-size private practices (3–20 providers) rarely employ dedicated call-center staff; front-desk receptionists wear multiple roles. Hiring additional FTE for call volume peaks is prohibitively expensive and inflexible for variable demand.
+**Staffing Challenge**: Small to mid-size private practices (3-20 providers) rarely employ dedicated call-center staff; front-desk receptionists wear multiple roles. Hiring additional FTE for call volume peaks is prohibitively expensive and inflexible for variable demand.
 
 ### Restaurants
 
@@ -105,7 +105,7 @@ The following limitations are acknowledged and should inform deployment expectat
 
 2. **Conversational AI does not reason like humans**: The agent operates via pattern matching and response generation, not causal reasoning. Subtle context clues or implied intent may be misinterpreted. Complex multi-step negotiations are not supported.
 
-3. **Real-time latency is bounded, not instant**: Bridge setup (Twilio → Ultravox) and intent processing introduce perceptible latency, informally estimated at 1–2 seconds during manual test calls. This figure has not been measured and no instrumentation exists to verify it. Customers accustomed to sub-100ms human responsiveness may perceive the agent as slow.
+3. **Real-time latency is bounded, not instant**: Bridge setup (Twilio → Ultravox) and intent processing introduce perceptible latency, informally estimated at 1-2 seconds during manual test calls. This figure has not been measured and no instrumentation exists to verify it. Customers accustomed to sub-100ms human responsiveness may perceive the agent as slow.
 
 4. **Knowledge integration is only as current as the source**: Appointment availability is accurate only if the clinic's calendar is up-to-date; menu availability is accurate only if POS inventory is refreshed. Stale integrations degrade agent accuracy.
 

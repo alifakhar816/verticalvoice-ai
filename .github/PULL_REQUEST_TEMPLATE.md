@@ -12,7 +12,7 @@
 - [ ] A feature flag was added/used if this PR ships user-facing behavior that isn't ready for all tenants (see `docs/architecture/` for the feature-flag convention)
 - [ ] Documentation was updated if this PR changes setup, environment variables, architecture, or user-facing behavior (`README.md`, `.claude/CLAUDE.md`/`.claude/AGENTS.md`, `docs/`)
 - [ ] No secrets, API keys, or real tenant/patient/customer data are committed (check `.env`, fixtures, test data, and log output in this diff)
-- [ ] Tenant-isolation impact considered — if this touches RLS policies, the tool gateway, webhook handlers, or any service-role code path, I've thought through whether it could leak data across tenants
+- [ ] Tenant-isolation impact considered. If this touches RLS policies, the tool gateway, webhook handlers, or any service-role code path, I've thought through whether it could leak data across tenants
 
 ## Tenant-isolation / security notes
 

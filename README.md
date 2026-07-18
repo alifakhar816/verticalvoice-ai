@@ -28,7 +28,7 @@ Businesses dependent on inbound phone contact face three endemic challenges:
 
 3. **Industry compliance requires expertise.** Healthcare clinics must protect patient data and handle emergencies; restaurants must track allergies and manage capacity; real estate firms must avoid discrimination in lead qualification. Non-compliance is costly; building these guardrails in-house is slow.
 
-VerticalVoice AI addresses this by deploying an AI receptionist tailored to a specific industry. It answers concurrent inbound calls without queueing and enforces industry compliance rules deterministically — compiled from the industry pack rather than left to model judgement. Per-tenant operating hours are configurable and stored, though enforcement against booking requests is not yet wired (see [known limitations](docs/compliance/known-limitations.md)).
+VerticalVoice AI addresses this by deploying an AI receptionist tailored to a specific industry. It answers concurrent inbound calls without queueing and enforces industry compliance rules deterministically. Those rules are compiled from the industry pack rather than left to model judgement. Per-tenant operating hours are configurable and stored, though enforcement against booking requests is not yet wired (see [known limitations](docs/compliance/known-limitations.md)).
 
 ---
 
@@ -36,16 +36,16 @@ VerticalVoice AI addresses this by deploying an AI receptionist tailored to a sp
 
 ### Agent Configuration & Lifecycle
 
-- **Guided onboarding wizard** — 10-step setup flow; tenants select industry, configure business profile, choose voice/persona, and activate live in minutes.
-- **Versioned agent configs** — compile, activate, and rollback agent configurations deterministically; no ambiguity about which prompt is live.
-- **Config-driven compilation** — business profile + industry pack + knowledge base → deterministic agent prompt and tool set (no LLM-decided policy).
+- **Guided onboarding wizard.** A 10-step setup flow. Tenants select industry, configure business profile, choose voice/persona, and activate live in minutes.
+- **Versioned agent configs.** Compile, activate, and roll back agent configurations deterministically, so there is never ambiguity about which prompt is live.
+- **Config-driven compilation.** Business profile + industry pack + knowledge base produce a deterministic agent prompt and tool set, with no LLM-decided policy.
 
 ### Inbound Call Handling
 
-- **Full call lifecycle** — inbound call routing, speech recognition, conversational turn-taking, tool invocation, and post-call summarization.
-- **Multi-provider voice runtime** — Ultravox (primary, optimized for latency) + Retell (fallback). Mock provider for local dev.
-- **Multi-provider telephony** — Twilio (primary) + Telnyx (cost-optimized) + Plivo. Mock provider for local dev.
-- **WebRTC browser calling** — test calls directly from the dashboard.
+- **Full call lifecycle.** Inbound call routing, speech recognition, conversational turn-taking, tool invocation, and post-call summarization.
+- **Multi-provider voice runtime.** Ultravox is primary and optimized for latency, with Retell as fallback. A mock provider covers local dev.
+- **Multi-provider telephony.** Twilio is primary, with Telnyx (cost-optimized) and Plivo alongside it. A mock provider covers local dev.
+- **WebRTC browser calling.** Place test calls directly from the dashboard.
 
 ### Industry-Specific Capabilities
 
@@ -73,25 +73,25 @@ VerticalVoice AI addresses this by deploying an AI receptionist tailored to a sp
 
 ### Intelligence & Analytics
 
-- **Post-call analysis** — automatic transcript, summary, and outcome classification.
-- **Call evaluation framework** — assess agent performance on latency, tone, accuracy, and compliance.
-- **Usage and ROI tracking** — dashboards showing call volume, resolution rate, cost per call, and revenue impact.
-- **Audit trail** — immutable log of all configuration changes, call events, and tool executions (compliance-friendly).
+- **Post-call analysis.** Automatic transcript, summary, and outcome classification.
+- **Call evaluation framework.** Assess agent performance on latency, tone, accuracy, and compliance.
+- **Usage and ROI tracking.** Dashboards show call volume, resolution rate, cost per call, and revenue impact.
+- **Audit trail.** An immutable log of all configuration changes, call events, and tool executions, which keeps compliance review straightforward.
 
 ### Knowledge & Integration
 
-- **Knowledge source ingestion** — upload documents, PDFs, or scrape websites; platform extracts facts and chunks.
-- **Fact extraction and review** — AI-extracted knowledge facts are reviewed before live use.
-- **Third-party integrations** — Google Calendar, Square POS, HubSpot CRM, Resend email.
-- **Outbound calling** — place outbound campaigns from contact lists; DNC and suppression list enforcement.
+- **Knowledge source ingestion.** Upload documents and PDFs or scrape websites. The platform extracts facts and chunks them.
+- **Fact extraction and review.** AI-extracted knowledge facts are reviewed before live use.
+- **Third-party integrations.** Google Calendar, Square POS, HubSpot CRM, Resend email.
+- **Outbound calling.** Place outbound campaigns from contact lists, with DNC and suppression list enforcement.
 
 ### Compliance & Safety
 
-- **Deterministic policy engine** — healthcare/restaurant/real-estate policies are compiled, not LLM-decided.
-- **DNC (Do Not Call) enforcement** — outbound calls check national and custom suppression lists.
-- **Recording consent versioning** — track consent state per call; support multiple recording consent models.
-- **GDPR & privacy** — subject data export and erasure endpoints; call retention policies.
-- **Redaction rules** — PII/PHI patterns (SSN, card numbers, medical terms) redacted from all outputs.
+- **Deterministic policy engine.** Healthcare, restaurant, and real estate policies are compiled rather than LLM-decided.
+- **DNC (Do Not Call) enforcement.** Outbound calls check national and custom suppression lists.
+- **Recording consent versioning.** Consent state is tracked per call, and multiple recording consent models are supported.
+- **GDPR & privacy.** Subject data export and erasure endpoints, plus call retention policies.
+- **Redaction rules.** PII/PHI patterns (SSN, card numbers, medical terms) are redacted from all outputs.
 
 ---
 
@@ -121,12 +121,12 @@ flowchart TB
     CallPath -.-> Config
 ```
 
-**Key design decision**: Every industry implements the same `IndustryPack` interface. The compiler, policy engine, and tool gateway never branch on industry type — vertical-specific behavior lives entirely inside the pack. This keeps healthcare HIPAA logic, restaurant allergen logic, and real estate Fair Housing logic isolated.
+**Key design decision**: Every industry implements the same `IndustryPack` interface. The compiler, policy engine, and tool gateway never branch on industry type. Vertical-specific behavior lives entirely inside the pack. This keeps healthcare HIPAA logic, restaurant allergen logic, and real estate Fair Housing logic isolated.
 
 Learn more:
-- [ADR-001: Vertical Pack Architecture](docs/architecture/ADR-001-vertical-pack-architecture.md) — decision rationale and trade-offs.
-- [System Architecture Diagram](docs/project/architecture-diagram.md) — detailed Mermaid flows with request paths.
-- [Architecture Inventory](docs/architecture/INVENTORY.md) — technology stack, database schema, file structure.
+- [ADR-001: Vertical Pack Architecture](docs/architecture/ADR-001-vertical-pack-architecture.md): decision rationale and trade-offs.
+- [System Architecture Diagram](docs/project/architecture-diagram.md): detailed Mermaid flows with request paths.
+- [Architecture Inventory](docs/architecture/INVENTORY.md): technology stack, database schema, file structure.
 
 ---
 
@@ -237,49 +237,49 @@ npm run test:watch # watch mode
 | `src/tests/contract/tool-gateway.test.ts` | Tool gateway contract validation; execution request/response format. |
 
 **CI Pipeline**: On every push to `master`, GitHub Actions runs:
-1. TypeScript compiler (`tsc --noEmit`) — catch type errors.
-2. ESLint — code quality, consistency.
-3. Vitest — unit/integration/contract tests with mock providers.
+1. TypeScript compiler (`tsc --noEmit`) to catch type errors.
+2. ESLint for code quality and consistency.
+3. Vitest for unit, integration, and contract tests with mock providers.
 
 ---
 
 ## Documentation
 
 ### Getting Started
-- [Project Charter](docs/academic/00-project-charter.md) — institution, team, and synopsis.
-- [Problem Statement](docs/academic/01-problem-statement.md) — why this problem matters.
-- [Objectives & Scope](docs/academic/02-objectives-and-scope.md) — what the project delivers.
+- [Project Charter](docs/academic/00-project-charter.md): institution, team, and synopsis.
+- [Problem Statement](docs/academic/01-problem-statement.md): why this problem matters.
+- [Objectives & Scope](docs/academic/02-objectives-and-scope.md): what the project delivers.
 
 ### Technical Deep Dives
-- [Architecture Decision Record (ADR-001)](docs/architecture/ADR-001-vertical-pack-architecture.md) — why we chose the pluggable pack pattern.
-- [Architecture Inventory](docs/architecture/INVENTORY.md) — complete technology stack and file structure.
-- [System Design Document](docs/academic/06-system-design.md) — detailed system architecture, data flow, and design rationale.
+- [Architecture Decision Record (ADR-001)](docs/architecture/ADR-001-vertical-pack-architecture.md): why we chose the pluggable pack pattern.
+- [Architecture Inventory](docs/architecture/INVENTORY.md): complete technology stack and file structure.
+- [System Design Document](docs/academic/06-system-design.md): detailed system architecture, data flow, and design rationale.
 
 ### Project & Demonstration
-- [Executive Brief](docs/project/executive-brief.md) — high-level summary for evaluation panels.
-- [Demo Walkthrough](docs/project/demo-walkthrough.md) — 6-scene guided tour with adversarial test cases.
-- [System Architecture Diagram](docs/project/architecture-diagram.md) — detailed Mermaid flows and component interactions.
-- [Data Flow Diagram](docs/project/data-flow-diagram.md) — call lifecycle, data paths, and provider contracts.
-- [Industry Pack Diagram](docs/project/industry-pack-diagram.md) — pack interface, capabilities, and vertical isolation.
-- [Security Story](docs/project/security-story.md) — authentication, authorization, compliance, and attack surface.
-- [Technical Appendix](docs/project/technical-appendix.md) — API routes, database schema, and implementation details.
-- [Cost Comparison](docs/project/cost-comparison.md) — ROI vs. traditional call centres and competing platforms.
-- [Roadmap](docs/project/roadmap.md) — feature pipeline and future work.
+- [Executive Brief](docs/project/executive-brief.md): high-level summary for evaluation panels.
+- [Demo Walkthrough](docs/project/demo-walkthrough.md): 6-scene guided tour with adversarial test cases.
+- [System Architecture Diagram](docs/project/architecture-diagram.md): detailed Mermaid flows and component interactions.
+- [Data Flow Diagram](docs/project/data-flow-diagram.md): call lifecycle, data paths, and provider contracts.
+- [Industry Pack Diagram](docs/project/industry-pack-diagram.md): pack interface, capabilities, and vertical isolation.
+- [Security Story](docs/project/security-story.md): authentication, authorization, compliance, and attack surface.
+- [Technical Appendix](docs/project/technical-appendix.md): API routes, database schema, and implementation details.
+- [Cost Comparison](docs/project/cost-comparison.md): ROI vs. traditional call centres and competing platforms.
+- [Roadmap](docs/project/roadmap.md): feature pipeline and future work.
 
 ### Compliance & Operations
-- [Known Limitations](docs/compliance/known-limitations.md) — honest gaps in healthcare, restaurant, and real estate coverage.
-- [Privacy Policy Outline](docs/compliance/privacy-policy-outline.md) — data handling, retention, and vertical-specific considerations.
-- [Deployment Guide](docs/architecture/DEPLOYMENT.md) — local dev, production deploy, environment setup.
-- [Feature Flags](docs/architecture/FEATURE-FLAGS.md) — feature gating and rollout strategy.
-- [Incident Response](docs/runbooks/incident-response.md) — debugging and recovery procedures.
-- [Backup & Restore](docs/runbooks/backup-restore.md) — database backup strategy.
+- [Known Limitations](docs/compliance/known-limitations.md): honest gaps in healthcare, restaurant, and real estate coverage.
+- [Privacy Policy Outline](docs/compliance/privacy-policy-outline.md): data handling, retention, and vertical-specific considerations.
+- [Deployment Guide](docs/architecture/DEPLOYMENT.md): local dev, production deploy, environment setup.
+- [Feature Flags](docs/architecture/FEATURE-FLAGS.md): feature gating and rollout strategy.
+- [Incident Response](docs/runbooks/incident-response.md): debugging and recovery procedures.
+- [Backup & Restore](docs/runbooks/backup-restore.md): database backup strategy.
 
 ### Research & References
-- [Literature Review](docs/academic/03-literature-review.md) — related work in conversational AI, call centre automation, compliance frameworks.
-- [Methodology](docs/academic/04-methodology.md) — system design process and evaluation approach.
-- [Requirements Specification](docs/academic/05-requirements-specification.md) — detailed functional and non-functional requirements.
-- [Testing & Evaluation](docs/academic/07-testing-and-evaluation.md) — test plan, evaluation metrics, and results.
-- [References](docs/academic/08-references.md) — bibliography and citations.
+- [Literature Review](docs/academic/03-literature-review.md): related work in conversational AI, call centre automation, compliance frameworks.
+- [Methodology](docs/academic/04-methodology.md): system design process and evaluation approach.
+- [Requirements Specification](docs/academic/05-requirements-specification.md): detailed functional and non-functional requirements.
+- [Testing & Evaluation](docs/academic/07-testing-and-evaluation.md): test plan, evaluation metrics, and results.
+- [References](docs/academic/08-references.md): bibliography and citations.
 
 ---
 
@@ -311,4 +311,4 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines on submitting issues, PRs,
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).

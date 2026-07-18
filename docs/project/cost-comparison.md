@@ -1,4 +1,4 @@
-# VerticalVoice AI — Cost Comparison
+# VerticalVoice AI: Cost Comparison
 
 **Pricing changes frequently. Every rate in this document should be
 re-verified against the provider's live pricing page before any real
@@ -24,8 +24,8 @@ means this decision is swappable without touching the compiler or the packs.
 
 | Provider | Inbound (per min) | Outbound (per min) | Notes |
 |---|---|---|---|
-| **Twilio** (primary, `TelephonyProvider`) | ~$0.0085 | ~$0.014 | Rates vary by destination country/number type; these are illustrative US toll rates. Twilio is the primary provider — it's what the demo tenants are wired to. |
-| **Telnyx** (cost-optimization provider, `TELEPHONY_PROVIDER=telnyx`) | Typically lower than Twilio at comparable volume | Typically lower than Twilio at comparable volume | Telnyx pricing is usage-tiered and route-dependent; the platform's `TelephonyProvider.estimateCost()` method (`src/providers/telephony/types.ts`) is the mechanism for getting a live, accurate quote per call — **do not hardcode a Telnyx rate** into product pricing, because it moves with route, volume tier, and number type. |
+| **Twilio** (primary, `TelephonyProvider`) | ~$0.0085 | ~$0.014 | Rates vary by destination country/number type; these are illustrative US toll rates. Twilio is the primary provider, and it's what the demo tenants are wired to. |
+| **Telnyx** (cost-optimization provider, `TELEPHONY_PROVIDER=telnyx`) | Typically lower than Twilio at comparable volume | Typically lower than Twilio at comparable volume | Telnyx pricing is usage-tiered and route-dependent; the platform's `TelephonyProvider.estimateCost()` method (`src/providers/telephony/types.ts`) is the mechanism for getting a live, accurate quote per call. **Do not hardcode a Telnyx rate** into product pricing, because it moves with route, volume tier, and number type. |
 
 Both providers implement the same `TelephonyProvider` interface, so switching
 the primary telephony vendor for a tenant (or for the whole platform) is a
@@ -57,11 +57,11 @@ what's being demonstrated, controlled almost entirely by the
 
 | Mode | Approx. monthly cost | What's running | How it's achieved |
 |---|---|---|---|
-| **Local Development** | Near $0 | Full app, full UI, full evaluation suite, no real phone calls | `VOICE_PROVIDER=mock` and `TELEPHONY_PROVIDER=mock` — the provider interfaces are satisfied by mock implementations, so the compiler, tool gateway, policy engine, dashboards, and the 140-scenario evaluation suite all run against synthetic data with zero external spend |
-| **Demonstration** | ~$20–75/month | A handful of real phone numbers + real Ultravox/Twilio minutes for live demo calls (e.g. demonstration calls to the 3 seeded demo tenants) | Real credentials plugged into `.env.local`, low call volume, one number per vertical, no outbound calling activated |
-| **Pilot** | ~$100–300/month | One or a few real small-business tenants running live inbound (and possibly limited outbound) traffic, real Supabase project (not local), real integrations (Calendar/POS/CRM) turned on per tenant | Scales with call volume; the per-100-calls math above is the basis for estimating this range at realistic small-business call volumes (a few hundred to low-thousands of calls/month) |
+| **Local Development** | Near $0 | Full app, full UI, full evaluation suite, no real phone calls | `VOICE_PROVIDER=mock` and `TELEPHONY_PROVIDER=mock`. Mock implementations satisfy the provider interfaces, so the compiler, tool gateway, policy engine, dashboards, and the 140-scenario evaluation suite all run against synthetic data with zero external spend |
+| **Demonstration** | ~$20 to $75/month | A handful of real phone numbers + real Ultravox/Twilio minutes for live demo calls (e.g. demonstration calls to the 3 seeded demo tenants) | Real credentials plugged into `.env.local`, low call volume, one number per vertical, no outbound calling activated |
+| **Pilot** | ~$100 to $300/month | One or a few real small-business tenants running live inbound (and possibly limited outbound) traffic, real Supabase project (not local), real integrations (Calendar/POS/CRM) turned on per tenant | Scales with call volume; the per-100-calls math above is the basis for estimating this range at realistic small-business call volumes (a few hundred to low-thousands of calls/month) |
 
 The provider abstraction layer (`src/providers/voice`, `src/providers/telephony`)
 is what makes moving between these three modes a configuration change instead
-of a code change — the same compiled agent config and the same tool gateway
+of a code change. The same compiled agent config and the same tool gateway
 run in all three modes.

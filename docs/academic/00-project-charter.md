@@ -35,7 +35,7 @@
 
 ## Project Synopsis
 
-VerticalVoice AI is a multi-tenant, cloud-based SaaS platform that deploys AI-powered voice calling agents for inbound and outbound customer engagement. The platform serves three industry verticals — **Healthcare**, **Restaurants**, and **Real Estate** — with a single unified core engine and industry-specific plugin packs that contribute specialized intents, tools, policies, and compliance guardrails.
+VerticalVoice AI is a multi-tenant, cloud-based SaaS platform that deploys AI-powered voice calling agents for inbound and outbound customer engagement. The platform serves three industry verticals (**Healthcare**, **Restaurants**, and **Real Estate**) from a single unified core engine and industry-specific plugin packs that contribute specialized intents, tools, policies, and compliance guardrails.
 
 The system automates first-point-of-contact interactions: healthcare clinics receive AI receptionists handling appointment booking and patient triage; restaurants receive ordering and reservation agents; real estate firms receive lead qualification and showing scheduling agents. Calls are routed through Twilio and processed by the Ultravox voice AI, with context and knowledge integrated from tenant-specific data sources (calendars, POS systems, CRM databases).
 
@@ -49,15 +49,15 @@ The platform demonstrates a Pakistan-based IT export model: a domestically devel
 
 This charter serves as the entry point to the academic documentation layer. The following files provide the detailed analysis expected by a Final Year Project defense panel:
 
-1. **00-project-charter.md** (this file) — Project identification, team, synopsis, and document roadmap
-2. **01-problem-statement.md** — Problem framing across three verticals; scope and explicit limitations
-3. **02-objectives-and-scope.md** — SMART objectives, measurable against the actual system; in-scope and out-of-scope
-4. **03-literature-review.md** — Conversational AI architectures, voice-agent pipelines, multi-tenant SaaS patterns, commercial landscape
-5. **04-methodology.md** — Iterative/incremental development with provider-adapter design; live production testing; AI-assistance transparency
-6. **05-requirements-specification.md** — Functional requirements (FR-1…FR-n) by module; non-functional requirements; traceability table
-7. **06-system-design.md** — C4-style context and container diagrams; inbound/outbound call flows; agent lifecycle; ERD for core tables
-8. **07-testing-and-evaluation.md** — Test strategy; existing test coverage; evaluation scenarios; gap analysis with prioritized remediation plan
-9. **08-references.md** — Consolidated IEEE-style bibliography of all cited sources
+1. **00-project-charter.md** (this file): Project identification, team, synopsis, and document roadmap
+2. **01-problem-statement.md**: Problem framing across three verticals; scope and explicit limitations
+3. **02-objectives-and-scope.md**: SMART objectives, measurable against the actual system; in-scope and out-of-scope
+4. **03-literature-review.md**: Conversational AI architectures, voice-agent pipelines, multi-tenant SaaS patterns, commercial landscape
+5. **04-methodology.md**: Iterative/incremental development with provider-adapter design; live production testing; AI-assistance transparency
+6. **05-requirements-specification.md**: Functional requirements (FR-1…FR-n) by module; non-functional requirements; traceability table
+7. **06-system-design.md**: C4-style context and container diagrams; inbound/outbound call flows; agent lifecycle; ERD for core tables
+8. **07-testing-and-evaluation.md**: Test strategy; existing test coverage; evaluation scenarios; gap analysis with prioritized remediation plan
+9. **08-references.md**: Consolidated IEEE-style bibliography of all cited sources
 
 ---
 
@@ -90,15 +90,15 @@ This charter serves as the entry point to the academic documentation layer. The 
 
 | Metric | Target | Actual |
 |--------|--------|--------|
-| Source code files | — | 263 |
-| Database tables | — | 91 |
+| Source code files | n/a | 263 |
+| Database tables | n/a | 91 |
 | API routes | ≥40 | 50 |
 | Test files | ≥5 | 8 |
 | Industry verticals | 3 | 3 (Healthcare, Restaurants, Real Estate) |
 | Live voice provider integrations | ≥1 | 2 (Ultravox, Retell) |
 | Telephony provider integrations | ≥1 | 3 (Twilio, Telnyx, Plivo) |
-| Inbound call success rate (live) | ≥90% | — (TBD by panel evaluation) |
-| P95 latency (inbound bridge to Ultravox) | <2s | — (TBD by panel evaluation) |
+| Inbound call success rate (live) | ≥90% | n/a (TBD by panel evaluation) |
+| P95 latency (inbound bridge to Ultravox) | <2s | n/a (TBD by panel evaluation) |
 
 ---
 
