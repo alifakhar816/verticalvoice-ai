@@ -3,9 +3,8 @@ import { createAdminClient } from "@/lib/database/supabase-admin";
 import { verifyToolToken } from "@/lib/telephony/tool-token";
 import { getToolHandler } from "@/lib/tools/registry";
 import { notifyStaff } from "@/lib/notifications/dispatch";
+import { isPositiveToolOutcome } from "@/lib/calls/summarize";
 import type { Json } from "@/lib/database/types";
-
-const POSITIVE_OUTCOME_KEYS = ["booked", "confirmed", "captured", "submitted", "created"];
 
 function describeOutcome(toolId: string, output: Record<string, unknown>): string {
   const idField = Object.entries(output).find(([k, v]) => k.endsWith("_id") && typeof v === "string");
@@ -66,7 +65,7 @@ export async function POST(
     // read-only lookups like check_availability/get_menu/search_listings.
     // Never for test calls: a business owner testing their agent shouldn't
     // get spammed with "new booking" emails for their own test bookings.
-    if (!auth.is_test && POSITIVE_OUTCOME_KEYS.some((k) => output[k] === true)) {
+    if (!auth.is_test && isPositiveToolOutcome(output)) {
       await notifyStaff(supabase, {
         tenantId: auth.tenant_id,
         type: toolId,

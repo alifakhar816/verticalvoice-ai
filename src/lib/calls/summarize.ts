@@ -7,7 +7,38 @@ interface ToolRunRow {
   output: unknown;
 }
 
-const POSITIVE_OUTCOME_KEYS = ["booked", "confirmed", "captured", "submitted", "created"];
+const POSITIVE_OUTCOME_KEYS = [
+  "booked",
+  "confirmed",
+  "captured",
+  "submitted",
+  "created",
+  "cancelled",
+  "updated",
+  "sent",
+];
+
+/**
+ * Did this tool call actually accomplish something for the caller?
+ *
+ * Explicit boolean flags win when a tool returns them. Otherwise fall back to
+ * "did it hand back the id of a thing it created" — tools like submit_order
+ * return `{order_id, status, total}` with no boolean at all, and treating
+ * those as merely "attempted" made a completed order read as a failed call.
+ */
+export function isPositiveToolOutcome(output: unknown): boolean {
+  if (!output || typeof output !== "object") return false;
+  const out = output as Record<string, unknown>;
+
+  const flags = POSITIVE_OUTCOME_KEYS.map((k) => out[k]).filter(
+    (v): v is boolean => typeof v === "boolean"
+  );
+  if (flags.length > 0) return flags.some((v) => v);
+
+  return Object.entries(out).some(
+    ([k, v]) => k.endsWith("_id") && typeof v === "string" && v.length > 0
+  );
+}
 
 function deriveOutcome(toolRuns: ToolRunRow[]): { outcomeType: string; disposition: string } {
   if (toolRuns.length === 0) {
@@ -19,10 +50,7 @@ function deriveOutcome(toolRuns: ToolRunRow[]): { outcomeType: string; dispositi
   }
 
   const successful = toolRuns.filter((r) => r.status === "success");
-  const positive = successful.find((r) => {
-    const out = r.output as Record<string, unknown> | null;
-    return !!out && POSITIVE_OUTCOME_KEYS.some((k) => out[k] === true);
-  });
+  const positive = successful.find((r) => isPositiveToolOutcome(r.output));
   if (positive) return { outcomeType: positive.tool_name, disposition: "resolved" };
   if (successful.length > 0) {
     return { outcomeType: successful[successful.length - 1].tool_name, disposition: "attempted" };
