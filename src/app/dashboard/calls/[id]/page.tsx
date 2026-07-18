@@ -24,7 +24,7 @@ import { createServerClient } from "@/lib/database/supabase-server";
 import { getCurrentTenantId } from "@/domain/tenants/current";
 import { getCall } from "@/domain/calls/service";
 import { TestBadge } from "@/components/shared/test-badge";
-import { displayCallerName } from "@/lib/calls/display";
+import { displayCounterparty } from "@/lib/calls/display";
 import { describeToolRun } from "@/lib/calls/tool-descriptions";
 import { RecordingPlayer } from "./recording-player";
 
@@ -274,7 +274,7 @@ export default async function CallDetailPage({
   const tenantTimezone = businessProfile?.timezone || "UTC";
 
   const caller = participants?.find((p) => p.role !== "agent") ?? null;
-  const callerLabel = caller?.display_name || displayCallerName(call.caller_number);
+  const callerLabel = caller?.display_name || displayCounterparty(call);
 
   const dateTime = new Date(call.started_at).toLocaleString(undefined, {
     timeZone: tenantTimezone,
@@ -537,7 +537,7 @@ export default async function CallDetailPage({
                     Phone
                   </dt>
                   <dd className="font-mono font-medium tabular-nums">
-                    {displayCallerName(call.caller_number)}
+                    {displayCounterparty(call)}
                   </dd>
                 </div>
                 <Separator />

@@ -20,7 +20,7 @@ import { getCurrentTenantId } from "@/domain/tenants/current";
 import { getAgentConfig } from "@/domain/agents/service";
 import { LiveCallOrb } from "@/components/shared/live-call-orb";
 import { TestBadge } from "@/components/shared/test-badge";
-import { displayCallerName } from "@/lib/calls/display";
+import { displayCounterparty } from "@/lib/calls/display";
 import type { Json } from "@/lib/database/types";
 import { OverviewStats } from "./overview-stats";
 
@@ -175,7 +175,7 @@ export default async function OverviewPage() {
       .eq("is_test", false),
     supabase
       .from("calls")
-      .select("id, caller_number, status, duration_seconds, started_at, direction, is_test")
+      .select("id, caller_number, called_number, status, duration_seconds, started_at, direction, is_test")
       .eq("tenant_id", tenantId)
       .order("started_at", { ascending: false })
       .limit(8),
@@ -323,7 +323,7 @@ export default async function OverviewPage() {
                       </span>
                       <div className="min-w-0">
                         <p className="flex items-center gap-1.5 truncate text-sm font-medium">
-                          {displayCallerName(call.caller_number)}
+                          {displayCounterparty(call)}
                           {call.is_test && <TestBadge />}
                         </p>
                         <p className="text-xs capitalize text-muted-foreground">

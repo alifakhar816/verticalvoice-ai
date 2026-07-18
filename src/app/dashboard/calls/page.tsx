@@ -82,6 +82,7 @@ export default async function CallsPage({
     id: call.id,
     startedAt: call.started_at,
     callerNumber: call.caller_number,
+    calledNumber: call.called_number,
     durationSeconds: call.duration_seconds,
     status: call.status,
     direction: call.direction,

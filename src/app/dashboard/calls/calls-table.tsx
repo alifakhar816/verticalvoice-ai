@@ -7,7 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { TestBadge } from "@/components/shared/test-badge";
-import { displayCallerName } from "@/lib/calls/display";
+import { displayCounterparty } from "@/lib/calls/display";
 import { cn } from "@/lib/utils";
 import {
   Eye,
@@ -22,6 +22,7 @@ export interface CallRow {
   id: string;
   startedAt: string;
   callerNumber: string | null;
+  calledNumber: string | null;
   durationSeconds: number | null;
   status: string;
   direction: string;
@@ -141,8 +142,15 @@ export function CallsTable({ calls, total, page, totalPages, direction, timezone
     return source.filter((call) => {
       if (query) {
         const matches =
-          displayCallerName(call.callerNumber).toLowerCase().includes(query) ||
+          displayCounterparty({
+            direction: call.direction,
+            caller_number: call.callerNumber,
+            called_number: call.calledNumber,
+          })
+            .toLowerCase()
+            .includes(query) ||
           (call.callerNumber ?? "").toLowerCase().includes(query) ||
+          (call.calledNumber ?? "").toLowerCase().includes(query) ||
           statusLabel(call.status).toLowerCase().includes(query);
         if (!matches) return false;
       }
@@ -281,7 +289,7 @@ export function CallsTable({ calls, total, page, totalPages, direction, timezone
                     Started
                   </th>
                   <th className="px-4 py-3 font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
-                    Caller
+                    Contact
                   </th>
                   <th className="px-4 py-3 font-mono text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
                     Duration
@@ -340,7 +348,11 @@ export function CallsTable({ calls, total, page, totalPages, direction, timezone
                         <td className="whitespace-nowrap px-4 py-3">
                           <div className="flex items-center gap-2">
                             <span className="text-sm font-medium">
-                              {displayCallerName(call.callerNumber)}
+                              {displayCounterparty({
+                                direction: call.direction,
+                                caller_number: call.callerNumber,
+                                called_number: call.calledNumber,
+                              })}
                             </span>
                             {call.isTest && <TestBadge />}
                           </div>

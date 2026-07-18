@@ -12,6 +12,28 @@ export function displayCallerName(callerNumber: string | null | undefined): stri
   return formatPhoneNumber(callerNumber);
 }
 
+/**
+ * The number of the *other* party on a call, which is what a dashboard reader
+ * actually wants to see.
+ *
+ * `caller_number` is only the counterparty on inbound calls. On outbound it is
+ * the business's own Twilio number, so a list keyed on it showed every outbound
+ * row as the business calling itself — under a column headed "Caller".
+ */
+export function displayCounterparty(call: {
+  direction?: string | null;
+  caller_number?: string | null;
+  called_number?: string | null;
+}): string {
+  const isOutbound = call.direction === "outbound";
+  const counterparty = isOutbound ? call.called_number : call.caller_number;
+  // Fall back to the other end rather than rendering "Unknown caller" when one
+  // side is missing — a number is more useful than a placeholder.
+  return displayCallerName(
+    counterparty ?? (isOutbound ? call.caller_number : call.called_number),
+  );
+}
+
 /** True when the value is a real dialable number rather than a soft-client id. */
 export function isRealPhoneNumber(value: string | null | undefined): boolean {
   if (!value) return false;
