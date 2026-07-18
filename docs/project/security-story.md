@@ -1,4 +1,4 @@
-# VerticalVoice AI — Security Story
+# VerticalVoice AI: Security Story
 
 One page, verifiable against the actual codebase. Every claim below points at
 a real file.
@@ -17,21 +17,21 @@ a real file.
   operations (e.g. webhook ingestion before the tenant is resolved).
 - Practical effect: even a bug in application code that forgets a `WHERE
   tenant_id = ?` clause cannot leak another tenant's patient records, menu
-  data, or leads — the database itself refuses the row.
+  data, or leads. The database itself refuses the row.
 
-## 2. Deterministic policy engine — not LLM-decided
+## 2. Deterministic policy engine, not LLM-decided
 
 - Compliance rules (HIPAA verification, Fair Housing, allergen disclosure,
   emergency escalation) are evaluated by `src/industries/core/policies.ts`,
   a plain TypeScript function (`evaluateAllPolicies`) that matches structured
-  `PolicyCondition`s against a `PolicyContext` — field equality, `in`/`not_in`,
+  `PolicyCondition`s against a `PolicyContext`: field equality, `in`/`not_in`,
   `gt`/`lt`, regex `matches`, etc.
 - The LLM never decides whether a policy passes or fails. It can only trigger
   a tool call; the gateway then runs the deterministic policy check
   independently of what the model "believes" happened.
 - Every `PolicyDecision` has an `allowed` boolean, a `severity`
   (`block`/`warn`/`log`), a `reason`, and where applicable a `regulation`
-  field — so a `block` decision is auditable and reproducible outside the
+  field, so a `block` decision is auditable and reproducible outside the
   conversation.
 
 ## 3. Tool Gateway's 10-step validation pipeline
@@ -44,13 +44,13 @@ through, in order:
 3. Resolve agent config (redaction level, HIPAA mode) for that tenant
 4. Confirm the tool is actually enabled for this specific call
 5. Validate the tool's input against a registered Zod schema
-6. Evaluate policies (`policies.ts`) — block on `severity: "block"` denials
+6. Evaluate policies (`policies.ts`), blocking on `severity: "block"` denials
 7. Check an idempotency key to prevent duplicate execution
 8. Execute the tool call, routed to the domain service
 9. Apply PII/PHI redaction rules to the output
 10. Log the tool run to `audit_events`
 
-No step can be skipped by a crafted prompt — they are sequential function
+No step can be skipped by a crafted prompt. They are sequential function
 calls in server code, not instructions the model can be talked out of.
 
 ## 4. Webhook signature verification
@@ -69,7 +69,7 @@ before any data is trusted or written. An unsigned or forged webhook claiming
   allowlist, with a short expiry (`exp`).
 - This is a **different trust boundary** from the dashboard's Supabase Auth
   session. The voice runtime, which is talking to an anonymous caller on the
-  phone, never receives a user's browser session — it only ever holds a
+  phone, never receives a user's browser session. It only ever holds a
   token that can invoke a narrow, pre-approved set of tools for one call and
   then expires.
 - The gateway's step 4 (tool enablement check) re-validates the token's
@@ -87,7 +87,7 @@ before any data is trusted or written. An unsigned or forged webhook claiming
 
 ## 7. Audit logging
 
-- Every tool call — success or failure — is written to `audit_events`
+- Every tool call, whether it succeeds or fails, is written to `audit_events`
   (`logToolRun()` in `gateway.ts`), including tool name, duration, status,
   and error message where applicable.
 - The dashboard exposes this at `/dashboard/audit`, giving a tenant (and a
@@ -99,7 +99,7 @@ before any data is trusted or written. An unsigned or forged webhook claiming
 - The `IndustryPack` tool interface (`src/industries/core/industry-pack.ts`)
   defines a `rateLimit` field (`maxCalls`, `windowSeconds`) as part of
   `ToolBinding`, so rate limits are declared per-tool, per-vertical, at the
-  pack level rather than hardcoded once for the whole platform — e.g. a
+  pack level rather than hardcoded once for the whole platform. A
   healthcare `check-insurance` call can be capped independently of a
   restaurant `get-menu` call. This is enforced as part of the tool
   configuration the gateway resolves before executing a tool (step 3/4).

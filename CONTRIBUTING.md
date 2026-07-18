@@ -12,11 +12,11 @@ This guide gets you from a fresh clone to a running app and a passing PR.
 ## Prerequisites
 
 - **Node.js 20** (matches `.github/workflows/ci.yml`)
-- **npm** (repo ships a `package-lock.json` — don't switch package managers)
+- **npm** (repo ships a `package-lock.json`, so don't switch package managers)
 - **Supabase CLI** (`brew install supabase/tap/supabase` or see
   [supabase.com/docs/guides/cli](https://supabase.com/docs/guides/cli)) and
   **Docker**, to run a local Supabase stack
-- No telephony or voice-AI accounts are required to develop locally — see
+- No telephony or voice-AI accounts are required to develop locally. See
   below.
 
 ## Local setup
@@ -30,8 +30,8 @@ supabase start                 # starts local Supabase (Docker required)
 npm run dev
 ```
 
-Open http://localhost:3000. For the full walkthrough — seeding demo data
-and authenticating as the demo user — see
+Open http://localhost:3000. For the full walkthrough, covering how to seed
+demo data and authenticate as the demo user, see
 [`docs/architecture/DEPLOYMENT.md`](docs/architecture/DEPLOYMENT.md).
 
 ### You do not need carrier credentials to contribute
@@ -43,9 +43,9 @@ VOICE_PROVIDER=mock
 TELEPHONY_PROVIDER=mock
 ```
 
-With both set to `mock`, the app runs end-to-end — calls, transcripts,
-tool-calling, the Test Center — without a Twilio, Telnyx, or Ultravox
-account. Only switch to `twilio` / `telnyx` / `ultravox` / `retell` if
+With both set to `mock`, the app runs end-to-end without a Twilio, Telnyx,
+or Ultravox account. That covers calls, transcripts, tool-calling, and the
+Test Center. Only switch to `twilio` / `telnyx` / `ultravox` / `retell` if
 you're specifically working on a provider adapter
 (`src/providers/telephony/`, `src/providers/voice/`) and have your own
 sandbox credentials for it.
@@ -104,7 +104,7 @@ docs: clarify mock provider setup in CONTRIBUTING
 
 Note: the existing git history mixes Conventional Commits (`feat:`, `fix:`)
 with plain descriptive messages from earlier in the project. That's a known
-inconsistency from before this convention was standardized — please use
+inconsistency from before this convention was standardized. Please use
 Conventional Commits for all new commits so the history is consistent from
 here forward.
 
@@ -121,19 +121,19 @@ Branch from `master`, keep branches scoped to one change.
 
 ## Pull request process
 
-1. Open a PR against `master` — the template will prompt you for lint/type/
+1. Open a PR against `master`. The template will prompt you for lint/type/
    test status, migrations, feature flags, docs, and tenant-isolation impact.
 2. Make sure CI is green.
 3. If you touched anything security- or tenant-isolation-relevant (RLS
    policies, `src/lib/security/`, `src/lib/telephony/tool-token.ts`,
    `src/providers/telephony/*/adapter.ts` webhook validation), call that out
-   explicitly in the PR description — see [SECURITY.md](SECURITY.md) for
+   explicitly in the PR description. See [SECURITY.md](SECURITY.md) for
    the security model these changes interact with.
 4. Squash-friendly PRs are preferred (keep the commit history readable).
 
 ## Reporting bugs / requesting features
 
-Use the issue forms under **New Issue** (`.github/ISSUE_TEMPLATE/`) — they
+Use the issue forms under **New Issue** (`.github/ISSUE_TEMPLATE/`). They
 ask for the vertical (healthcare/restaurant/real-estate), provider mode
 (mock vs. live), and call ID where relevant, which is usually enough to
 reproduce voice/telephony issues without back-and-forth.
@@ -142,6 +142,6 @@ reproduce voice/telephony issues without back-and-forth.
 
 This repo includes `.claude/CLAUDE.md` / `.claude/AGENTS.md` with project context for AI
 coding agents. If you're using Claude Code, it will pick this up
-automatically — it's worth reading before diving into `src/domain` and
+automatically. It's worth reading before diving into `src/domain` and
 `src/industries`, since the vertical-pack pattern isn't obvious from file
 names alone.

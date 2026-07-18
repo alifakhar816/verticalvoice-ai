@@ -3,20 +3,20 @@
 Feature flags are defined in `src/config/features.ts`. All flags default to
 `false`/off. Runtime values are read from `NEXT_PUBLIC_*` environment
 variables (client-visible, since flags gate UI behavior as well as
-server logic) — see `.env.example` for the corresponding variable names.
+server logic). See `.env.example` for the corresponding variable names.
 
 | Flag | Env var | Default | Overridable via env? |
 |---|---|---|---|
 | `healthcare_demo_mode` | `NEXT_PUBLIC_FF_HEALTHCARE_DEMO_MODE` | `false` | Yes |
 | `restaurant_ordering` | `NEXT_PUBLIC_FF_RESTAURANT_ORDERING` | `false` | Yes |
 | `real_estate_outbound` | `NEXT_PUBLIC_FF_REAL_ESTATE_OUTBOUND` | `false` | Yes |
-| `phi_mode` | `NEXT_PUBLIC_FF_PHI_MODE` (present in code but ignored) | `false` | **No — hardcoded `false` in `getFeatureFlags()`** |
+| `phi_mode` | `NEXT_PUBLIC_FF_PHI_MODE` (present in code but ignored) | `false` | **No. Hardcoded `false` in `getFeatureFlags()`** |
 | `outbound_calling` | `NEXT_PUBLIC_FF_OUTBOUND_CALLING` | `false` | Yes |
 
 ## Flag-by-flag detail
 
 ### `healthcare_demo_mode`
-- **Gates**: Healthcare vertical demo behaviors — sample scenarios, scripted
+- **Gates**: Healthcare vertical demo behaviors: sample scenarios, scripted
   demo data paths, and any UI surfaces specific to showcasing the healthcare
   `IndustryPack` (`src/industries/healthcare/`) without touching real
   patient data.
@@ -27,8 +27,8 @@ server logic) — see `.env.example` for the corresponding variable names.
 
 ### `restaurant_ordering`
 - **Gates**: The restaurant vertical's ordering flow (`src/industries/restaurant/`,
-  `src/domain/restaurant/`) — menu lookups, order placement, and Square POS
-  integration surfaces.
+  `src/domain/restaurant/`), covering menu lookups, order placement, and
+  Square POS integration surfaces.
 - **Safe to enable**: Any environment once the vertical is ready to demo or
   ship. In Staging/Production, confirm Square OAuth credentials are
   configured for that environment before enabling, or ordering calls will
@@ -38,16 +38,16 @@ server logic) — see `.env.example` for the corresponding variable names.
 - **Gates**: Real estate vertical outbound-calling-adjacent UI (lead
   follow-up scheduling, HubSpot sync triggers) in
   `src/industries/real-estate/`, `src/domain/real-estate/`. This flag is
-  distinct from the platform-wide `outbound_calling` flag below — it gates
+  distinct from the platform-wide `outbound_calling` flag below. It gates
   vertical-specific UI/logic, not the underlying ability to place outbound
   calls.
 - **Safe to enable**: Only after `outbound_calling` is enabled and the
   compliance checklist (below) is complete, since enabling this without the
   platform-wide flag exposes UI for a capability that isn't actually live.
 
-### `phi_mode` — NEVER enable outside a reviewed environment
+### `phi_mode`: NEVER enable outside a reviewed environment
 - **Gates**: Any code path that would treat call/session data as containing
-  Protected Health Information — stricter logging redaction, extended
+  Protected Health Information: stricter logging redaction, extended
   retention/encryption requirements, BAA-covered storage assumptions, and
   healthcare-specific compliance UI.
 - **Current state**: `getFeatureFlags()` in `src/config/features.ts`
@@ -60,11 +60,11 @@ server logic) — see `.env.example` for the corresponding variable names.
   in place with Supabase and any voice/telephony subprocessors, HIPAA
   technical safeguards implemented and audited, data retention/deletion
   policy documented). See `docs/compliance/`. Enabling it requires an actual
-  code change to `getFeatureFlags()`, not just an env var — this is
+  code change to `getFeatureFlags()`, not just an env var. That is
   deliberate friction to prevent accidental activation. Do not remove that
   friction without compliance sign-off recorded in `docs/compliance/`.
 
-### `outbound_calling` — OFF by default everywhere
+### `outbound_calling`: OFF by default everywhere
 - **Gates**: The platform-wide ability to originate outbound calls (as
   opposed to only receiving inbound calls). This is the master switch that
   controls whether Twilio/Telnyx outbound call APIs are ever invoked.
@@ -80,7 +80,7 @@ server logic) — see `.env.example` for the corresponding variable names.
   - [ ] Rate limiting / dialing caps in place to avoid runaway costs or
         spam-like behavior
   - [ ] Sign-off recorded in `docs/compliance/`
-- **Never enable** in Local or Preview — those environments run with
+- **Never enable** in Local or Preview. Those environments run with
   `TELEPHONY_PROVIDER=mock`, so even if this flag were flipped on, no real
   calls would be placed, but the flag should still stay off to keep
   environment behavior predictable and testable.

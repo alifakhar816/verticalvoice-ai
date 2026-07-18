@@ -1,7 +1,7 @@
 # Security Policy
 
 VerticalVoice AI is a multi-tenant AI voice-calling platform handling
-call transcripts, recordings, and — in the healthcare vertical —
+call transcripts, recordings, and, in the healthcare vertical,
 PHI-adjacent data (patient name, phone, DOB, appointment reason). This
 document describes what security controls actually exist in the codebase
 today, and what does not, so nobody assumes guarantees that aren't there.
@@ -33,8 +33,8 @@ any public write-up.
 
 ## Supported versions
 
-This is a single-branch (`master`), pre-1.0 academic/production project —
-there is no long-term-support branch matrix. Only the latest commit on
+This is a single-branch (`master`), pre-1.0 academic/production project.
+There is no long-term-support branch matrix. Only the latest commit on
 `master` is supported; please report issues against the current `HEAD`.
 
 ## Security model
@@ -45,7 +45,7 @@ What's actually implemented, with pointers into the code:
   tenant-scoped tables enforce RLS policies so one tenant cannot read or
   write another tenant's data through the standard client. Service-role
   access (which bypasses RLS) is confined to specific server-side paths
-  that need it (webhook ingestion, provisioning) — see
+  that need it (webhook ingestion, provisioning). See
   `docs/architecture/` for which routes use the service-role client and why.
 - **Signed tool tokens** (`TOOL_TOKEN_SECRET`,
   `src/lib/telephony/tool-token.ts`) authenticate tool-calling requests
@@ -67,7 +67,7 @@ What's actually implemented, with pointers into the code:
   `TELNYX_WEBHOOK_SECRET`, in addition to the pre-existing 5-minute
   timestamp freshness check (replay protection). The route fails closed
   (`503`) if `TELNYX_WEBHOOK_SECRET` is unset, and is only reachable when
-  `TELEPHONY_PROVIDER=telnyx` (`404` otherwise) — see "Known gaps, fixed"
+  `TELEPHONY_PROVIDER=telnyx` (`404` otherwise). See "Known gaps, fixed"
   below for the history of this control.
 - **Idempotency keys** (`src/lib/idempotency/`, and the tool gateway's
   idempotency cache in `src/lib/tools/gateway.ts`) prevent duplicate
@@ -87,7 +87,7 @@ What's actually implemented, with pointers into the code:
 
 - **[FIXED] Telnyx webhook route accepted unauthenticated writes.**
   `src/app/api/v1/webhooks/telnyx/route.ts` is a standalone public Next.js
-  API route — it is **not** gated by `TELEPHONY_PROVIDER` and was
+  API route. It is **not** gated by `TELEPHONY_PROVIDER` and was
   reachable on the deployed app regardless of which telephony provider was
   configured. This is a materially different (and worse) exposure than an
   earlier version of this document claimed: that earlier version inspected
@@ -99,14 +99,14 @@ What's actually implemented, with pointers into the code:
 
   Before the fix, the route only checked that a `telnyx-timestamp` header
   was present and within a 5-minute window, and that a
-  `telnyx-signature-ed25519` header was merely *present* — the signature
+  `telnyx-signature-ed25519` header was merely *present*. The signature
   bytes were never cryptographically verified. If `TELNYX_WEBHOOK_SECRET`
   was unset, validation was skipped entirely (`console.warn` and
   continue). Concretely, anyone who found the URL could `POST` arbitrary
   JSON with a fresh timestamp and any garbage signature to: mark calls
   `completed` with an attacker-chosen `duration_seconds`, overwrite
   `recording_url` on an existing call row with an arbitrary URL, or write
-  fabricated `audit_events` rows — all via `createAdminClient()`, a
+  fabricated `audit_events` rows, all via `createAdminClient()`, a
   service-role client that bypasses RLS.
 
   **Fix applied:**
@@ -124,7 +124,7 @@ What's actually implemented, with pointers into the code:
 
   **Residual risk:** `src/providers/telephony/telnyx/adapter.ts`'s
   `validateWebhook` function still contains the old present-but-unverified
-  stub. It is dead code — nothing in the codebase calls it — but it exists
+  stub. Nothing in the codebase calls it, so it is dead code, but it exists
   and could mislead a future integrator into treating it as real
   verification if they wire it up elsewhere. It should be fixed to match
   the route's verification (or removed) in a follow-up. Separately,
@@ -141,7 +141,7 @@ What's actually implemented, with pointers into the code:
   limits are `limit × instance count`, and a retried request routed to a
   different instance won't hit the idempotency cache. See
   [`docs/compliance/known-limitations.md`](docs/compliance/known-limitations.md)
-  ("Infrastructure & accounts") for the full detail — this is a known
+  ("Infrastructure & accounts") for the full detail. This is a known
   scaling limitation, not a data-isolation bug, but it's listed here
   because it affects duplicate-action protection under load.
 
@@ -153,7 +153,7 @@ What's actually implemented, with pointers into the code:
   or production-ready for real patient data.** Full detail, including
   consent/outbound-calling gaps and data-retention gaps, is tracked in
   [`docs/compliance/known-limitations.md`](docs/compliance/known-limitations.md)
-  — that file is the canonical, living list; this section summarizes the
+  and that file is the canonical, living list. This section summarizes the
   parts most relevant to reporting a security issue.
 
 If you find a gap not listed above or in

@@ -62,7 +62,7 @@ which is only visible to maintainers, or by contacting the project's
 Group Leader, Fakhar Ali, through the contact details on their GitHub
 profile (https://github.com/alifakhar816). This uses the same reporting
 mechanism as [SECURITY.md](SECURITY.md) because it is the one verified,
-always-available private channel for this repository — we are not
+always-available private channel for this repository. We are not
 publishing an unverified email address here.
 
 All complaints will be reviewed and investigated promptly and fairly.

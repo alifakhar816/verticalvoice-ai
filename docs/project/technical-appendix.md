@@ -1,4 +1,4 @@
-# VerticalVoice AI — Technical Appendix
+# VerticalVoice AI: Technical Appendix
 
 For readers who want to go one level deeper than the summary. Every number here
 was pulled directly from the repository, not estimated.
@@ -14,9 +14,9 @@ was pulled directly from the repository, not estimated.
   `listings`/`showings`/`real_estate_leads` for real estate).
 - **RLS**: 30 `CREATE POLICY` statements enforce Row-Level Security across
   the schema. Tenant isolation is a database-layer guarantee, not an
-  application-layer convention — see `docs/project/security-story.md`
+  application-layer convention. See `docs/project/security-story.md`
   for the detailed argument and the anon-key-vs-service-role-key split.
-- Supporting infrastructure tables worth noting: `idempotency_keys` and
+- Supporting infrastructure tables include `idempotency_keys` and
   `job_attempts`/`jobs` (safe retry of async work like the call-normalizer),
   `dead_letter_events` (failed webhook/job recovery), `webhook_deliveries`
   (webhook audit trail), `consent_records`/`consent_versions`/`dnc_checks`/
@@ -45,7 +45,7 @@ was pulled directly from the repository, not estimated.
   intents/tools/policies, and greeting).
 - `compiledAt` is itself derived deterministically from the input hash
   (`baseTimestamp + (hashNum % 1000000)`) rather than `Date.now()`, so two
-  compiler runs with identical inputs produce byte-identical output —
+  compiler runs with identical inputs produce byte-identical output. That is
   useful for testing and for detecting unintended config drift between
   environments.
 - The compiler pipeline: build system prompt from ordered/filtered
@@ -64,7 +64,7 @@ was pulled directly from the repository, not estimated.
   - Adversarial (shared across verticals): 20 (`src/tests/scenarios/adversarial.ts`)
 - Adversarial scenarios are grouped into 4 categories of 5 each: prompt
   injection (`adv-inject-*`), data exfiltration (`adv-exfil-*`), safety
-  (`adv-safety-*`), and resilience (`adv-resil-*`) — e.g. `adv-resil-002`
+  (`adv-safety-*`), and resilience (`adv-resil-*`). For example, `adv-resil-002`
   simulates a webhook replay attack, `adv-safety-003` simulates a consent
   bypass attempt.
 - Each `EvaluationScenario` (defined in `src/industries/core/industry-pack.ts`)
@@ -75,7 +75,7 @@ was pulled directly from the repository, not estimated.
   `task_completion`, `escalation_accuracy`), plus an `expectedOutcome` of
   `success` / `escalation` / `failure`.
 - Healthcare and real-estate scenario files include dedicated policy
-  sub-suites — e.g. real estate has 5 explicitly tagged `fair_housing`
+  sub-suites: real estate has 5 explicitly tagged `fair_housing`
   scenarios (`category: "fair_housing"`), restaurant has 5 tagged `allergen`
   scenarios.
 
@@ -101,13 +101,13 @@ need cross-tenant access before a tenant is resolved (e.g. webhook ingestion).
 
 ## Related documents
 
-- `docs/project/architecture-diagram.md` — high-level system architecture
-- `docs/project/data-flow-diagram.md` — end-to-end call sequence
-- `docs/project/industry-pack-diagram.md` — `IndustryPack` interface + comparison table
-- `docs/project/cost-comparison.md` — provider cost breakdown and budget modes
-- `docs/project/security-story.md` — security model, file-by-file
-- `docs/project/demo-walkthrough.md` — 6-scene demo walkthrough
-- `docs/project/executive-brief.md` — one-page executive summary
-- `docs/project/roadmap.md` — what comes after the FYP
-- `docs/architecture/INVENTORY.md` — full technology/file inventory
-- `docs/architecture/ADR-001-vertical-pack-architecture.md` — the architecture decision record this whole platform is built on
+- `docs/project/architecture-diagram.md`: high-level system architecture
+- `docs/project/data-flow-diagram.md`: end-to-end call sequence
+- `docs/project/industry-pack-diagram.md`: `IndustryPack` interface + comparison table
+- `docs/project/cost-comparison.md`: provider cost breakdown and budget modes
+- `docs/project/security-story.md`: security model, file-by-file
+- `docs/project/demo-walkthrough.md`: 6-scene demo walkthrough
+- `docs/project/executive-brief.md`: one-page executive summary
+- `docs/project/roadmap.md`: what comes after the FYP
+- `docs/architecture/INVENTORY.md`: full technology/file inventory
+- `docs/architecture/ADR-001-vertical-pack-architecture.md`: the architecture decision record this whole platform is built on

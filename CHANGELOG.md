@@ -40,8 +40,8 @@ https://verticalvoice.alphaos.tech. Four days of active development,
   competition-ready project package (`a86a7f0`).
 - Twilio inbound-call webhook bridging live calls into Ultravox
   (`74d47e5`).
-- Real outbound calling — Twilio + Ultravox — with industry-specific call
-  types (`9d85016`).
+- Real outbound calling over Twilio and Ultravox, with industry-specific
+  call types (`9d85016`).
 - Live browser-based test calling via Twilio Client (WebRTC) (`d904fa3`).
 - AI-driven post-call actions: Ultravox tool-calling, per-industry
   handlers, call summaries, the Operations dashboard, and staff
@@ -65,7 +65,7 @@ https://verticalvoice.alphaos.tech. Four days of active development,
 - Build failures, lint errors, and local dev environment issues
   (`1758a2c`).
 - Twilio signature validation failing behind a reverse proxy (`2a8392a`).
-- Provider webhooks blocked by RLS — added a service-role admin client
+- Provider webhooks blocked by RLS. Added a service-role admin client
   for server-side webhook ingestion (`21b4a46`).
 - Missing unique constraint on `calls.provider_call_id` allowing
   duplicate call rows (`15a65da`).
@@ -77,7 +77,7 @@ https://verticalvoice.alphaos.tech. Four days of active development,
   provisioning gap, and public marketing routes being unreachable
   (`5f000ae`).
 - Tenant provisioning bootstrap blocked by RLS for real (non-service-role)
-  users — routed through the service role (`812a518`).
+  users, now routed through the service role (`812a518`).
 - QA backlog across Call Detail, Analytics, Test Center, Team, Audit Log,
   the Agent toggle, and auth/marketing/onboarding polish (`6336697`).
 - Two additional bugs surfaced by live production testing (`6849dc6`).
@@ -92,8 +92,8 @@ https://verticalvoice.alphaos.tech. Four days of active development,
 - Bookings not surfacing on the dashboard: the agent now receives the
   current date, the operations window was widened, outcomes self-heal,
   and reconcile can be triggered on demand (`4bd92fc`).
-- Tool calls that return an ID were being misreported as failed —
-  id-returning tools are now treated as successful outcomes, fixing
+- Tool calls that return an ID were being misreported as failed.
+  Id-returning tools are now treated as successful outcomes, which fixes
   under-reported orders (`d24bec8`).
 - Phone orders were missing the customer's name and showing placeholder
   values instead of hiding them (`cddfe52`).

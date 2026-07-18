@@ -12,7 +12,7 @@
 
 Files are grouped below by their actual location in `src/tests/`.
 
-### Unit Tests — `src/tests/unit/` (7 files)
+### Unit Tests: `src/tests/unit/` (7 files)
 
 **compiler.test.ts**: Agent config compilation (pack → prompt)  
 **policies.test.ts**: Compliance guardrails (DNC, fair-housing, recording consent)  
@@ -22,11 +22,11 @@ Files are grouped below by their actual location in `src/tests/`.
 **fair-housing.test.ts**: Real-estate fair-housing compliance (steering prevention)  
 **tmp-prompt-check.test.ts**: Ad-hoc prompt assertion retained from development; not part of the intended regression suite and should be removed or renamed
 
-### Integration Tests — `src/tests/integration/` (1 file)
+### Integration Tests: `src/tests/integration/` (1 file)
 
 **rls.test.ts**: Row-Level Security prevents cross-tenant access
 
-### Contract Tests — `src/tests/contract/` (1 file)
+### Contract Tests: `src/tests/contract/` (1 file)
 
 **tool-gateway.test.ts**: Tool API schema validation
 
@@ -80,11 +80,11 @@ Caller → Agent qualifies lead → Showing scheduled → Outcome: "resolved"
 
 | Gap | Impact | Effort | Priority |
 |---|---|---|---|
-| No component tests | Medium — UI untested | 2–4w | Medium |
-| No route handler tests | High — API validation untested | 1–2w | HIGH |
-| No E2E automation | Medium — Manual only | 2–4w | HIGH |
-| No load testing | High — Scaling unknown | 3–5w | HIGH |
-| No error scenario tests | High — Failure behavior unknown | 1–2w | HIGH |
+| No component tests | Medium (UI untested) | 2-4w | Medium |
+| No route handler tests | High (API validation untested) | 1-2w | HIGH |
+| No E2E automation | Medium (manual only) | 2-4w | HIGH |
+| No load testing | High (scaling unknown) | 3-5w | HIGH |
+| No error scenario tests | High (failure behavior unknown) | 1-2w | HIGH |
 
 ---
 
@@ -112,7 +112,7 @@ Caller → Agent qualifies lead → Showing scheduled → Outcome: "resolved"
 | Criterion | Result |
 |---|---|
 | Functional correctness | Yes (tested + live verified) |
-| Latency (P95) | NOT MEASURED — no timing instrumentation exists on the bridge path; see note below |
+| Latency (P95) | NOT MEASURED; no timing instrumentation exists on the bridge path; see note below |
 | Multi-tenant isolation | ✓ Verified (RLS + audit logs) |
 | Compliance (PHI/consent/FH) | ✓ Implemented and tested |
 | Scalability (100+ calls) | ? Unknown (not stress-tested) |
@@ -120,7 +120,7 @@ Caller → Agent qualifies lead → Showing scheduled → Outcome: "resolved"
 
 ---
 
-> **On latency**: the figure of roughly 1–2 seconds quoted elsewhere in this documentation is an informal impression from manual test calls, not a measurement. The codebase records tool-call durations (`src/lib/tools/gateway.ts`) and defines a `response_time` p95 metric in the industry-pack schema, but nothing instruments the end-to-end path from Twilio webhook to first agent utterance, and no percentile has been computed from call data. Establishing a real P50/P95 baseline is outstanding work.
+> **On latency**: the figure of roughly 1-2 seconds quoted elsewhere in this documentation is an informal impression from manual test calls, not a measurement. The codebase records tool-call durations (`src/lib/tools/gateway.ts`) and defines a `response_time` p95 metric in the industry-pack schema, but nothing instruments the end-to-end path from Twilio webhook to first agent utterance, and no percentile has been computed from call data. Establishing a real P50/P95 baseline is outstanding work.
 
 ---
 

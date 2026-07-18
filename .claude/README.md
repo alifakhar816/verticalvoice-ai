@@ -1,4 +1,4 @@
-# `.claude/` — local development tooling configuration
+# `.claude/`: local development tooling configuration
 
 This directory holds configuration for the AI-assisted development tooling
 used while building VerticalVoice AI. **Nothing here affects the running
@@ -12,7 +12,7 @@ no effect on a production build or deployment.
 | `CLAUDE.md` | Entry point loaded automatically by Claude Code. Imports `AGENTS.md`. |
 | `AGENTS.md` | Project-specific rules for AI coding agents working in this repo. |
 | `launch.json` | Local dev-server launch configuration. |
-| `state/` | Transient local agent state. Gitignored — never committed. |
+| `state/` | Transient local agent state. Gitignored, never committed. |
 
 ## Why these files live here rather than at the repository root
 
@@ -23,6 +23,6 @@ the repo preserves the development workflow.
 
 This works because Claude Code discovers project memory at **both**
 `<repo>/CLAUDE.md` and `<repo>/.claude/CLAUDE.md`, and because `@`-imports
-inside a memory file resolve relative to the directory of the importing file
-— so the `@AGENTS.md` reference in `.claude/CLAUDE.md` resolves to
+inside a memory file resolve relative to the directory of the importing file.
+The `@AGENTS.md` reference in `.claude/CLAUDE.md` therefore resolves to
 `.claude/AGENTS.md`. Verified against Claude Code v2.1.193.

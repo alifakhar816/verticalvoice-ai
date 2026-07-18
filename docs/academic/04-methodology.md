@@ -28,7 +28,7 @@ This design enabled **mock-first development**: developers could build and test 
 Rather than reimplementing business logic per vertical, the team designed an industry-pack system:
 
 - **Core pack**: Common call handling, compliance utilities, generic tools
-- **Industry packs**: Healthcare, Restaurant, Real-Estate — each contributes:
+- **Industry packs**: Healthcare, Restaurant, Real-Estate. Each pack contributes:
   - Domain-specific intents
   - Domain-specific tool integrations
   - Domain-specific guardrail policies
@@ -210,7 +210,7 @@ https://verticalvoice.alphaos.tech runs on Hostinger VPS:
 - docs/compliance/known-limitations.md: Honest gaps
 - docs/runbooks: Operational procedures
 
-**This Package**: Files 00–08 provide comprehensive academic documentation.
+**This Package**: Files 00-08 provide comprehensive academic documentation.
 
 ---
 

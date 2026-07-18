@@ -1,8 +1,8 @@
-# VerticalVoice AI — Industry Pack Interface
+# VerticalVoice AI: Industry Pack Interface
 
 Every vertical in VerticalVoice AI is a single object that satisfies the
 `IndustryPack` TypeScript interface defined in
-`src/industries/core/industry-pack.ts`. That interface has 12 fields —
+`src/industries/core/industry-pack.ts`. That interface has 12 fields:
 onboarding schema, defaults, intent catalog, outcome schemas, tools,
 knowledge schema, policy pack, escalation rules, analytics definition,
 dashboard modules, evaluation suite, demo fixtures, and prompt fragments.
@@ -95,11 +95,11 @@ classDiagram
 | Dimension | Healthcare | Restaurant | Real Estate |
 |---|---|---|---|
 | **Primary workflow** | Book / reschedule / cancel an appointment with a provider | Take a reservation or phone order | Book a property showing / capture a buyer or seller lead |
-| **Unique safety guard** | `no_diagnosis` policy — agent must decline to diagnose symptoms and offer an appointment instead (e.g. rash inquiry: "Does NOT attempt to diagnose the rash") | Allergen policy — agent must provide allergen info but explicitly **must not guarantee** allergen-free preparation (cross-contamination risk) | `fair_housing` policy — agent must refuse to steer callers toward/away from neighborhoods based on protected characteristics (family status, race, national origin, source of income) |
+| **Unique safety guard** | `no_diagnosis` policy: agent must decline to diagnose symptoms and offer an appointment instead (e.g. rash inquiry: "Does NOT attempt to diagnose the rash") | Allergen policy: agent must provide allergen info but explicitly **must not guarantee** allergen-free preparation (cross-contamination risk) | `fair_housing` policy: agent must refuse to steer callers toward/away from neighborhoods based on protected characteristics (family status, race, national origin, source of income) |
 | **Unique dashboard metric** | Patient Satisfaction (satisfaction score + trend by call type) | Allergen Inquiries (menu performance module) | Lead Conversion Rate (lead pipeline module) |
 | **Unique tool** | `lookup-patient` / `check-insurance` | `get-menu` (category + dietary filter) | `book-showing` (listing-scoped scheduling) |
 
 Because the interface is shared, adding a fourth vertical (the ADR calls out
 legal, dental, and automotive as roadmap candidates) means writing one new
-pack module that fills in this same shape — no changes to the compiler, the
-policy engine, or the tool gateway.
+pack module that fills in this same shape. The compiler, the policy engine,
+and the tool gateway all stay untouched.

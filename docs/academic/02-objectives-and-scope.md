@@ -65,7 +65,7 @@ The following objectives are Specific, Measurable, Achievable, Relevant, and Tim
 - Architecture documentation includes C4 diagrams, data flows, and tech-stack justification
 - Deployment runbook enables clean environment setup from source code
 - Known limitations are honestly documented; no false claims about capabilities
-- This academic documentation package (00–08 files) is complete and references code
+- This academic documentation package (00-08 files) is complete and references code
 
 **Target Timeline**: Complete by final submission (July 2026)
 
@@ -184,7 +184,7 @@ The following objectives are Specific, Measurable, Achievable, Relevant, and Tim
 - Inflated market projections (e.g., "$187.7B market by 2030" claimed without source)
 - Claimed features that do not exist in the codebase (e.g., "multi-language support" when only English is implemented)
 - 100% test coverage of all 263 source files (realistic target is ≥80% of critical paths)
-- Zero latency or instant intent recognition (acceptable range is 1–3 seconds)
+- Zero latency or instant intent recognition (acceptable range is 1-3 seconds)
 
 ### Legitimate Scope Reductions (Without Penalty)
 
@@ -199,11 +199,11 @@ The following objectives are Specific, Measurable, Achievable, Relevant, and Tim
 
 This project tests the hypothesis that **Pakistan-based software can compete on cost and compliance specialization**. Specific economic claims:
 
-**Claimed**: Competitive pricing at $200–$500/month (vs. Western incumbents at $1,000+/month)  
+**Claimed**: Competitive pricing at $200-$500/month (vs. Western incumbents at $1,000+/month)  
 **Status**: Not verified with real customer contracts; this is a *projection based on development cost*
 
 **Claimed**: "91% profit margin" per the mid-year report  
-**Status**: Unsourced; dropped from objectives as unsustainable. Actual economics depend on customer acquisition cost, hosting cost, and customer lifetime value — none of which are measured in this pilot.
+**Status**: Unsourced; dropped from objectives as unsustainable. Actual economics depend on customer acquisition cost, hosting cost, and customer lifetime value. None of these is measured in this pilot.
 
 **Revised Economic Objective**: Demonstrate that a functioning production platform can be deployed in Pakistan at 1/10th the cost of equivalent Western development, enabling entry-level pricing for emerging-market customers.
 
@@ -218,7 +218,7 @@ This project tests the hypothesis that **Pakistan-based software can compete on 
 | Research & Requirements | Jan 2026 | Jan 2026 | Mid-year report (submitted) |
 | Development | Jan 2026 | Jul 2026 | Live platform; 37 commits at time of writing; 263 source files |
 | Testing & Evaluation | Jan 2026 | Jul 2026 | 9 test files; live call testing |
-| Documentation | Jan 2026 | Jul 2026 | Academic docs (00–08); architecture docs; runbooks |
+| Documentation | Jan 2026 | Jul 2026 | Academic docs (00-08); architecture docs; runbooks |
 | Final Defense | Jul 2026 | Jul 2026 | This documentation package; live demo |
 
 ---
