@@ -15,7 +15,11 @@ import "@/industries";
 import { getIndustryPack } from "@/industries/core/registry";
 import { buildOutboundSystemPrompt } from "@/lib/telephony/outbound-prompt";
 import { withCurrentDateContext } from "@/lib/telephony/prompt-context";
-import { buildSelectedTools } from "@/lib/telephony/ultravox-tools";
+import {
+  buildSelectedTools,
+  type CustomToolDefinition,
+  type TenantToolSettings,
+} from "@/lib/telephony/ultravox-tools";
 import { createUltravoxCall } from "@/lib/telephony/ultravox";
 import { placeOutboundCall } from "@/lib/telephony/twilio";
 
@@ -98,14 +102,48 @@ async function main() {
   const [call] = await insertRes.json();
   console.log(`call row          : ${call.id}`);
 
-  const selectedTools = buildSelectedTools(pack, {
-    callId: call.id,
-    tenantId: TENANT,
-    industry: pack.id,
-  });
-  console.log(`tools wired       : ${selectedTools.length}`);
+  // Loaded over REST rather than via `loadTenantToolSettings`, which wants a
+  // Supabase client this script deliberately does not build — but the shape
+  // handed to `buildSelectedTools` is identical, so a tool this tenant has
+  // switched off really is absent from the call the script places.
+  const settingRows = await get<
+    { tool_id: string; enabled: boolean; description_override: string | null }[]
+  >(`agent_tool_settings?tenant_id=eq.${TENANT}&select=tool_id,enabled,description_override`);
+  const customRows = await get<CustomToolDefinition[]>(
+    `custom_tools?tenant_id=eq.${TENANT}&enabled=is.true&select=name,description,parameters,http_url,http_method`
+  );
 
-  const uv = await createUltravoxCall(systemPrompt, voiceId, selectedTools);
+  const toolSettings: TenantToolSettings = {
+    packOverrides: Object.fromEntries(
+      settingRows.map((row) => [
+        row.tool_id,
+        { enabled: row.enabled, descriptionOverride: row.description_override },
+      ])
+    ),
+    customTools: customRows,
+  };
+
+  const selectedTools = buildSelectedTools(
+    pack,
+    {
+      callId: call.id,
+      tenantId: TENANT,
+      industry: pack.id,
+    },
+    toolSettings
+  );
+  console.log(`tools wired       : ${selectedTools.length}`);
+  console.log(`  pack disabled   : ${settingRows.filter((r) => !r.enabled).length}`);
+  console.log(`  custom tools    : ${customRows.length}`);
+
+  // Mirror the real outbound route: the engine settings in the active snapshot
+  // must reach the call, otherwise this test call is not testing what ships.
+  const uv = await createUltravoxCall(systemPrompt, voiceId, selectedTools, {
+    temperature: version?.snapshot?.temperature,
+    model: version?.snapshot?.model,
+    speed: version?.snapshot?.voice?.speed,
+    language: version?.snapshot?.voice?.language,
+  });
   if (!uv.joinUrl) throw new Error("Ultravox returned no joinUrl");
   console.log(`ultravox call     : ${uv.callId}`);
 

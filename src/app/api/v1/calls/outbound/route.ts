@@ -2,8 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/database/supabase-server";
 import { createAdminClient } from "@/lib/database/supabase-admin";
 import { getCurrentTenantId } from "@/domain/tenants/current";
-import { createUltravoxCall } from "@/lib/telephony/ultravox";
-import { buildSelectedTools } from "@/lib/telephony/ultravox-tools";
+import { createUltravoxCall, type UltravoxCallOptions } from "@/lib/telephony/ultravox";
+import { buildSelectedTools, loadTenantToolSettings } from "@/lib/telephony/ultravox-tools";
 import { withCurrentDateContext } from "@/lib/telephony/prompt-context";
 import { placeOutboundCall } from "@/lib/telephony/twilio";
 import { z } from "zod";
@@ -146,6 +146,10 @@ export async function POST(request: NextRequest) {
 
     let voiceId: string | null = null;
     let compiledPrompt: string | null = null;
+    // Engine settings the tenant chose. Hoisted out of the block below so they
+    // survive to the createUltravoxCall call — they are stored and shown on the
+    // agent dashboard, so they have to actually reach the call.
+    let engineOptions: UltravoxCallOptions = {};
     if (activeConfig) {
       const { data: version } = await admin
         .from("agent_config_versions")
@@ -154,10 +158,18 @@ export async function POST(request: NextRequest) {
         .single();
       const snapshot = version?.snapshot as {
         system_prompt?: string;
-        voice?: { voice_id?: string } | null;
+        model?: string;
+        temperature?: number;
+        voice?: { voice_id?: string; speed?: number; language?: string } | null;
       } | null;
       voiceId = snapshot?.voice?.voice_id ?? null;
       compiledPrompt = snapshot?.system_prompt ?? null;
+      engineOptions = {
+        temperature: snapshot?.temperature,
+        model: snapshot?.model,
+        speed: snapshot?.voice?.speed,
+        language: snapshot?.voice?.language,
+      };
     }
 
     const businessName = businessProfile?.business_name ?? "the business";
@@ -194,13 +206,26 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const selectedTools = buildSelectedTools(pack, {
-      callId: call.id,
-      tenantId: tenant_id,
-      industry: pack.id,
-    });
+    // Same tenant tool settings the inbound path applies, so an outbound call
+    // and an inbound call for one tenant expose an identical tool catalog.
+    const toolSettings = await loadTenantToolSettings(admin, tenant_id);
 
-    const ultravoxCall = await createUltravoxCall(systemPrompt, voiceId, selectedTools);
+    const selectedTools = buildSelectedTools(
+      pack,
+      {
+        callId: call.id,
+        tenantId: tenant_id,
+        industry: pack.id,
+      },
+      toolSettings
+    );
+
+    const ultravoxCall = await createUltravoxCall(
+      systemPrompt,
+      voiceId,
+      selectedTools,
+      engineOptions
+    );
     if (!ultravoxCall.joinUrl) {
       await admin.from("calls").update({ status: "failed" }).eq("id", call.id);
       return NextResponse.json(

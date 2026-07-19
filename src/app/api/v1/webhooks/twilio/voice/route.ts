@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/database/supabase-admin';
 import { validateTwilioSignature } from '@/lib/webhooks/signature';
 import { createUltravoxCall } from '@/lib/telephony/ultravox';
-import { buildSelectedTools } from '@/lib/telephony/ultravox-tools';
+import { buildSelectedTools, loadTenantToolSettings } from '@/lib/telephony/ultravox-tools';
 import { withCurrentDateContext } from '@/lib/telephony/prompt-context';
 import { logger } from '@/lib/observability/logger';
 import '@/industries';
@@ -96,7 +96,9 @@ export async function POST(request: NextRequest) {
 
     const snapshot = version?.snapshot as {
       system_prompt?: string;
-      voice?: { voice_id?: string } | null;
+      model?: string;
+      temperature?: number;
+      voice?: { voice_id?: string; speed?: number; language?: string } | null;
     } | null;
 
     const systemPrompt = snapshot?.system_prompt;
@@ -139,13 +141,30 @@ export async function POST(request: NextRequest) {
       .single();
 
     const pack = industry ? getIndustryPack(industry) : undefined;
+    // The tenant's own tool choices (disabled tools, reworded descriptions,
+    // custom tools) are layered over the pack catalog here, so an inbound
+    // caller reaches exactly the tools the dashboard says are on.
+    const toolSettings =
+      pack && callRow ? await loadTenantToolSettings(supabase, tenantId) : undefined;
     const selectedTools =
       pack && callRow
-        ? buildSelectedTools(pack, { callId: callRow.id, tenantId, industry: pack.id, isTest: isTestCall })
+        ? buildSelectedTools(
+            pack,
+            { callId: callRow.id, tenantId, industry: pack.id, isTest: isTestCall },
+            toolSettings
+          )
         : undefined;
 
     // Create the Ultravox call bridged to this Twilio call
-    const ultravoxCall = await createUltravoxCall(datedSystemPrompt, voiceId, selectedTools);
+    // Engine settings the tenant chose. These are stored and shown on the agent
+    // dashboard, so they have to actually reach the call — until now they were
+    // dropped here and the displayed values meant nothing.
+    const ultravoxCall = await createUltravoxCall(datedSystemPrompt, voiceId, selectedTools, {
+      temperature: snapshot?.temperature,
+      model: snapshot?.model,
+      speed: snapshot?.voice?.speed,
+      language: snapshot?.voice?.language,
+    });
 
     if (!ultravoxCall.joinUrl) {
       logger.error('twilio-voice-webhook: Ultravox call created without joinUrl', {

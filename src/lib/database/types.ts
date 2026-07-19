@@ -3944,6 +3944,75 @@ export interface Database {
         };
         Relationships: [];
       };
+      agent_tool_settings: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          tool_id: string;
+          enabled: boolean;
+          description_override: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          tool_id: string;
+          enabled?: boolean;
+          description_override?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          tool_id?: string;
+          enabled?: boolean;
+          description_override?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
+      custom_tools: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          description: string;
+          parameters: Json;
+          http_url: string;
+          http_method: string;
+          enabled: boolean;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          description: string;
+          parameters?: Json;
+          http_url: string;
+          http_method?: string;
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          name?: string;
+          description?: string;
+          parameters?: Json;
+          http_url?: string;
+          http_method?: string;
+          enabled?: boolean;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: Record<string, never>;

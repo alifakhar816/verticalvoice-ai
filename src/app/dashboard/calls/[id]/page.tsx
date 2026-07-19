@@ -304,7 +304,15 @@ export default async function CallDetailPage({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{callerLabel}</h1>
-          <p className="font-mono text-sm text-muted-foreground">Call {call.id}</p>
+          {/* A bare UUID told the reader nothing. Lead with when the call
+              happened and which way it went; keep a short reference for
+              support, with the full id available on hover. */}
+          <p className="text-sm text-muted-foreground">
+            {call.direction === "outbound" ? "Outbound call" : "Inbound call"} · {dateTime} ·{" "}
+            <span className="font-mono" title={call.id}>
+              ref {call.id.slice(0, 8)}
+            </span>
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           {call.is_test && <TestBadge />}
@@ -547,7 +555,15 @@ export default async function CallDetailPage({
                     Cost
                   </dt>
                   <dd className="font-mono font-medium tabular-nums">
-                    {costRow ? formatCurrency(costRow.total_cost, costRow.currency) : "N/A"}
+                    {costRow ? (
+                      formatCurrency(costRow.total_cost, costRow.currency)
+                    ) : call.status === "completed" ? (
+                      // Costing happens on the next reconcile sweep, so a call
+                      // that just ended is pending rather than free.
+                      <span className="text-muted-foreground">Calculating…</span>
+                    ) : (
+                      <span className="text-muted-foreground">Not billed yet</span>
+                    )}
                   </dd>
                 </div>
               </dl>

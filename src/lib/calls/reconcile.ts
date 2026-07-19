@@ -1,6 +1,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Database, Json } from "@/lib/database/types";
 import { summarizeCall } from "./summarize";
+import { computeCallCost } from "./cost";
 import { captureContactFromCall } from "@/lib/contacts/capture";
 
 const UV_BASE = process.env.ULTRAVOX_BASE_URL ?? "https://api.ultravox.ai/api";
@@ -117,6 +118,17 @@ export async function reconcileCall(
         segments: transcript.segments,
       });
     }
+  }
+
+  // Cost. The rates lived only in src/workers/call-normalizer, which nothing
+  // invokes, so real calls were never costed and every call detail page read
+  // "N/A" while seeded demo calls showed figures. Upsert keyed on call_id so a
+  // repeated sweep re-states the same row rather than charging twice.
+  const cost = computeCallCost(update.duration_seconds);
+  if (cost) {
+    await supabase
+      .from("call_costs")
+      .upsert({ call_id: call.id, tenant_id: call.tenant_id, ...cost }, { onConflict: "call_id" });
   }
 
   // Summary + outcome (summarizeCall is itself idempotent).
