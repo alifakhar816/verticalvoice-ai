@@ -126,9 +126,18 @@ export async function reconcileCall(
   // repeated sweep re-states the same row rather than charging twice.
   const cost = computeCallCost(update.duration_seconds);
   if (cost) {
-    await supabase
+    const { error: costError } = await supabase
       .from("call_costs")
       .upsert({ call_id: call.id, tenant_id: call.tenant_id, ...cost }, { onConflict: "call_id" });
+    // This return value used to be discarded. The upsert was failing on every
+    // call — ON CONFLICT (call_id) needs a matching unique index, which the
+    // table did not have until migration 015 — and nothing surfaced it, so the
+    // cost simply never appeared and the UI waited forever.
+    if (costError) {
+      console.error(
+        `[reconcile] failed to write cost for call ${call.id}: ${costError.message}`
+      );
+    }
   }
 
   // Summary + outcome (summarizeCall is itself idempotent).
