@@ -2,10 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/database/supabase-server";
 import { createAdminClient } from "@/lib/database/supabase-admin";
 import { getCurrentTenantId } from "@/domain/tenants/current";
-import { validateToolSettingsPatch } from "@/lib/validation/agent-tools";
+import {
+  validateParameterOverrides,
+  validateToolSettingsPatch,
+} from "@/lib/validation/agent-tools";
 import "@/industries";
 import { getIndustryPack } from "@/industries/core/registry";
 import type { IndustryId } from "@/industries/core/industry-pack";
+import type { Json } from "@/lib/database/types";
 
 /**
  * Per-tenant settings for ONE industry-pack tool.
@@ -68,11 +72,25 @@ export async function PATCH(
       );
     }
 
+    // A parameter override is only meaningful against the tool's real
+    // parameters, so it is checked against the binding we just resolved rather
+    // than in the schema: the schema can see the shape, only the binding knows
+    // that `notes` is optional and `date` is not.
+    if (patch.parameter_overrides !== undefined) {
+      const parameterCheck = validateParameterOverrides(
+        patch.parameter_overrides,
+        binding.parameters
+      );
+      if (!parameterCheck.ok) {
+        return NextResponse.json({ error: parameterCheck.message }, { status: 400 });
+      }
+    }
+
     // Read the current row so an omitted field keeps its stored value rather
     // than being reset to the column default by the upsert.
     const { data: existing } = await admin
       .from("agent_tool_settings")
-      .select("id, enabled, description_override")
+      .select("id, enabled, description_override, parameter_overrides")
       .eq("tenant_id", tenantId)
       .eq("tool_id", toolId)
       .maybeSingle();
@@ -87,6 +105,16 @@ export async function PATCH(
           ? patch.description_override.trim()
           : null;
 
+    // Replaced wholesale rather than merged. The UI always sends the complete
+    // map for a tool, and a merge would make "stop overriding this parameter"
+    // impossible to express — the absent key would read as "unchanged" instead
+    // of "back to the pack wording", which is the whole point of the sparse
+    // representation.
+    const nextParameterOverrides =
+      patch.parameter_overrides === undefined
+        ? ((existing?.parameter_overrides ?? {}) as Json)
+        : (patch.parameter_overrides as unknown as Json);
+
     const { error: upsertError } = await admin
       .from("agent_tool_settings")
       .upsert(
@@ -95,6 +123,7 @@ export async function PATCH(
           tool_id: toolId,
           enabled: nextEnabled,
           description_override: nextOverride,
+          parameter_overrides: nextParameterOverrides,
           updated_at: new Date().toISOString(),
         },
         { onConflict: "tenant_id,tool_id" }
@@ -118,6 +147,9 @@ export async function PATCH(
         enabled: nextEnabled,
         previous_enabled: existing?.enabled ?? true,
         description_overridden: nextOverride !== null,
+        parameters_overridden: Object.keys(
+          (nextParameterOverrides ?? {}) as Record<string, unknown>
+        ),
       },
     });
 

@@ -32,6 +32,52 @@ export const TOOL_PARAMETER_TYPES = [
 
 export const HTTP_METHODS = ["POST", "GET", "PUT", "PATCH", "DELETE"] as const;
 
+/**
+ * Bounds for a custom tool's runtime limits. These mirror the CHECK
+ * constraints in migration 013 exactly — Postgres is the enforcement of
+ * record, this layer exists so the refusal can be phrased for a business owner
+ * instead of surfacing a constraint violation.
+ *
+ * The ceilings are not arbitrary. 120s is the longest a tool may hold a live
+ * phone call open before the silence is worse than the failure — a caller
+ * waiting two minutes for "let me check that" has already hung up. 20s is the
+ * default because it is Ultravox's own, so a tenant who never touches the
+ * field gets exactly today's behaviour.
+ *
+ * The rate ceiling bounds the damage a looping model (or a compromised call
+ * token) can do to a tenant's own endpoint within one call: 600/min is one
+ * invocation every 100ms sustained, well past anything a conversation
+ * produces, and 30 is a generous default for a real call.
+ */
+export const MIN_TOOL_TIMEOUT_SECONDS = 1;
+export const MAX_TOOL_TIMEOUT_SECONDS = 120;
+export const DEFAULT_TOOL_TIMEOUT_SECONDS = 20;
+
+export const MIN_TOOL_RATE_LIMIT_PER_MINUTE = 1;
+export const MAX_TOOL_RATE_LIMIT_PER_MINUTE = 600;
+export const DEFAULT_TOOL_RATE_LIMIT_PER_MINUTE = 30;
+
+const timeoutSecondsSchema = z
+  .number()
+  .int("Enter a whole number of seconds.")
+  .min(MIN_TOOL_TIMEOUT_SECONDS, "Give the tool at least 1 second to answer.")
+  .max(
+    MAX_TOOL_TIMEOUT_SECONDS,
+    `Wait at most ${MAX_TOOL_TIMEOUT_SECONDS} seconds. Beyond that the caller is left in silence long enough to hang up.`
+  );
+
+const rateLimitPerMinuteSchema = z
+  .number()
+  .int("Enter a whole number of uses per minute.")
+  .min(
+    MIN_TOOL_RATE_LIMIT_PER_MINUTE,
+    "Allow the tool to be used at least once a minute, or turn it off instead."
+  )
+  .max(
+    MAX_TOOL_RATE_LIMIT_PER_MINUTE,
+    `Allow at most ${MAX_TOOL_RATE_LIMIT_PER_MINUTE} uses a minute.`
+  );
+
 export const toolParameterSchema = z.object({
   name: z
     .string()
@@ -134,6 +180,10 @@ export const customToolSchema = z.object({
   http_url: httpUrlSchema,
   http_method: z.enum(HTTP_METHODS).default("POST"),
   enabled: z.boolean().default(true),
+  timeout_seconds: timeoutSecondsSchema.default(DEFAULT_TOOL_TIMEOUT_SECONDS),
+  rate_limit_per_minute: rateLimitPerMinuteSchema.default(
+    DEFAULT_TOOL_RATE_LIMIT_PER_MINUTE
+  ),
 });
 
 export type CustomToolInput = z.infer<typeof customToolSchema>;
@@ -141,9 +191,42 @@ export type CustomToolInput = z.infer<typeof customToolSchema>;
 /** Every field optional, for a partial edit of an existing custom tool. */
 export const customToolUpdateSchema = customToolSchema.partial();
 
+/**
+ * One tenant override for ONE parameter of a pack tool.
+ *
+ * Both fields are optional and both are sparse: `{ enabled: false }` changes
+ * whether the parameter is collected without touching its wording, and
+ * `{ description: "..." }` the reverse. An absent field means "keep the pack's
+ * value", so an override row never has to restate what it is not changing.
+ *
+ * Note what is NOT here: `name`, `type` and `required`. The handlers in
+ * src/lib/tools/*.ts read their inputs by name and assume the declared type,
+ * so a tenant renaming `date` to `booking_date` — or marking a required input
+ * optional — would produce a handler that throws mid-call on a real caller.
+ * That failure would be invisible from this screen, so the fields simply are
+ * not offered. See validateParameterOverrides for the matching semantic check.
+ */
+export const parameterOverrideSchema = z
+  .object({
+    description: z
+      .string()
+      .trim()
+      .min(1, "Give this input a short description, or leave it unchanged.")
+      .max(MAX_TOOL_DESCRIPTION_LENGTH, "That input description is too long.")
+      .optional(),
+    enabled: z.boolean().optional(),
+  })
+  .strict();
+
+export const parameterOverridesSchema = z.record(z.string(), parameterOverrideSchema);
+
+export type ParameterOverride = z.infer<typeof parameterOverrideSchema>;
+export type ParameterOverrides = z.infer<typeof parameterOverridesSchema>;
+
 export const toolSettingsPatchSchema = z
   .object({
     enabled: z.boolean().optional(),
+    parameter_overrides: parameterOverridesSchema.optional(),
     description_override: z
       .string()
       .trim()
@@ -157,7 +240,10 @@ export const toolSettingsPatchSchema = z
       .optional(),
   })
   .refine(
-    (value) => value.enabled !== undefined || value.description_override !== undefined,
+    (value) =>
+      value.enabled !== undefined ||
+      value.description_override !== undefined ||
+      value.parameter_overrides !== undefined,
     { message: "Nothing was changed." }
   );
 
@@ -260,4 +346,53 @@ export function validateToolSettingsPatch(
     return { ok: false, message: firstMessage(parsed.error, "That change is not valid.") };
   }
   return { ok: true, value: parsed.data };
+}
+
+/** The subset of a pack `ToolParameter` this validator needs. */
+export interface KnownParameter {
+  name: string;
+  required: boolean;
+}
+
+/**
+ * Checks a parameter-override map against the tool's ACTUAL parameters.
+ *
+ * The zod schema above can only say the shape is right. Two rules need the
+ * live binding to check, and both exist to stop a tenant from breaking their
+ * own agent in a way they could not diagnose:
+ *
+ *   - An override for a parameter the tool does not have is rejected rather
+ *     than stored. Storing it would be inert today and would silently spring
+ *     to life if a future pack ever introduced that name.
+ *
+ *   - A REQUIRED parameter cannot be switched off. The handler reads it
+ *     unconditionally, so dropping it from the tool definition produces a
+ *     mid-call failure on a real caller — the model would simply never have
+ *     been asked to collect it. Rewording a required parameter is fine and
+ *     stays allowed; only ceasing to collect it is refused.
+ */
+export function validateParameterOverrides(
+  overrides: ParameterOverrides,
+  parameters: readonly KnownParameter[]
+): ValidationResult<ParameterOverrides> {
+  const byName = new Map(parameters.map((parameter) => [parameter.name, parameter]));
+
+  for (const [name, override] of Object.entries(overrides)) {
+    const parameter = byName.get(name);
+    if (!parameter) {
+      return {
+        ok: false,
+        message: `This tool does not collect anything called "${name}".`,
+      };
+    }
+
+    if (override.enabled === false && parameter.required) {
+      return {
+        ok: false,
+        message: `"${name}" is required for this tool to work, so it cannot be switched off. You can reword it instead, or turn the whole tool off.`,
+      };
+    }
+  }
+
+  return { ok: true, value: overrides };
 }

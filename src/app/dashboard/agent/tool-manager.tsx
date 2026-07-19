@@ -11,8 +11,14 @@ import { Separator } from "@/components/ui/separator";
 import { ChevronDown, Info, Loader2, Plus, Trash2, Wrench } from "lucide-react";
 import { toast } from "sonner";
 import {
+  DEFAULT_TOOL_RATE_LIMIT_PER_MINUTE,
+  DEFAULT_TOOL_TIMEOUT_SECONDS,
   HTTP_METHODS,
+  MAX_TOOL_RATE_LIMIT_PER_MINUTE,
+  MAX_TOOL_TIMEOUT_SECONDS,
   MIN_TOOL_DESCRIPTION_LENGTH,
+  MIN_TOOL_RATE_LIMIT_PER_MINUTE,
+  MIN_TOOL_TIMEOUT_SECONDS,
   MAX_CUSTOM_TOOL_PARAMETERS,
   TOOL_NAME_PATTERN,
   TOOL_PARAMETER_TYPES,
@@ -25,6 +31,10 @@ interface ToolParameterView {
   type: (typeof TOOL_PARAMETER_TYPES)[number];
   required: boolean;
   description: string;
+  defaultDescription: string | null;
+  descriptionOverride: string | null;
+  enabled: boolean;
+  canDisable: boolean;
 }
 
 interface EffectiveTool {
@@ -41,6 +51,8 @@ interface EffectiveTool {
   httpUrl: string | null;
   httpMethod: string | null;
   customToolId: string | null;
+  timeoutSeconds: number;
+  rateLimitPerMinute: number | null;
 }
 
 interface DraftParameter {
@@ -56,6 +68,9 @@ interface DraftTool {
   http_url: string;
   http_method: (typeof HTTP_METHODS)[number];
   parameters: DraftParameter[];
+  /** Held as strings so the field can be empty mid-typing without snapping. */
+  timeout_seconds: string;
+  rate_limit_per_minute: string;
 }
 
 const EMPTY_DRAFT: DraftTool = {
@@ -64,6 +79,8 @@ const EMPTY_DRAFT: DraftTool = {
   http_url: "",
   http_method: "POST",
   parameters: [],
+  timeout_seconds: String(DEFAULT_TOOL_TIMEOUT_SECONDS),
+  rate_limit_per_minute: String(DEFAULT_TOOL_RATE_LIMIT_PER_MINUTE),
 };
 
 /** "create_reservation" -> "create reservation" — the UI never shows raw ids. */
@@ -114,6 +131,9 @@ export function ToolManager() {
   const [submitting, setSubmitting] = useState(false);
   // Per-tool description override drafts, keyed by tool id.
   const [overrideDrafts, setOverrideDrafts] = useState<Record<string, string>>({});
+  // Per-parameter wording drafts, keyed by "<toolId>:<parameterName>". Kept
+  // separate from `tools` so an unsaved edit never masquerades as saved state.
+  const [paramDrafts, setParamDrafts] = useState<Record<string, string>>({});
 
   const load = useCallback(async () => {
     try {
@@ -215,6 +235,63 @@ export function ToolManager() {
     }
   }
 
+  /**
+   * Saves the parameter overrides for one pack tool.
+   *
+   * The complete map for the tool is sent every time, not just the parameter
+   * that changed: the server replaces the column wholesale, which is what
+   * makes "clear this override" expressible. `patch` is the one parameter the
+   * owner just touched, layered over whatever is already stored.
+   */
+  async function saveParameterOverrides(
+    tool: EffectiveTool,
+    parameterName: string,
+    patch: { description?: string; enabled?: boolean }
+  ) {
+    const overrides: Record<string, { description?: string; enabled?: boolean }> = {};
+
+    for (const param of tool.parameters) {
+      const isTarget = param.name === parameterName;
+      const draft = paramDrafts[`${tool.id}:${param.name}`];
+      const description = isTarget && patch.description !== undefined
+        ? patch.description
+        : (draft ?? param.descriptionOverride ?? "");
+      const enabled = isTarget && patch.enabled !== undefined ? patch.enabled : param.enabled;
+
+      const entry: { description?: string; enabled?: boolean } = {};
+      // Only non-default values are sent — an override equal to the pack's own
+      // wording is not an override, and storing it would make "reset" a lie.
+      if (description.trim()) entry.description = description.trim();
+      if (param.canDisable && !enabled) entry.enabled = false;
+      if (Object.keys(entry).length > 0) overrides[param.name] = entry;
+    }
+
+    setPendingId(tool.id);
+    try {
+      const res = await fetch(`/api/v1/agents/tools/${encodeURIComponent(tool.id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parameter_overrides: overrides }),
+      });
+      const body = await res.json();
+      if (!res.ok) {
+        toast.error(body.error ?? "That change could not be saved.");
+        return;
+      }
+      toast.success("Saved. Your agent will use this on the next call.");
+      setParamDrafts((prev) => {
+        const next = { ...prev };
+        delete next[`${tool.id}:${parameterName}`];
+        return next;
+      });
+      await load();
+    } catch {
+      toast.error("That change could not be saved.");
+    } finally {
+      setPendingId(null);
+    }
+  }
+
   async function deleteCustomTool(tool: EffectiveTool) {
     setPendingId(tool.id);
     try {
@@ -251,6 +328,10 @@ export function ToolManager() {
       http_method: (HTTP_METHODS.find((m) => m === tool.httpMethod) ??
         "POST") as (typeof HTTP_METHODS)[number],
       parameters: tool.parameters.map((p) => ({ ...p })),
+      timeout_seconds: String(tool.timeoutSeconds),
+      rate_limit_per_minute: String(
+        tool.rateLimitPerMinute ?? DEFAULT_TOOL_RATE_LIMIT_PER_MINUTE
+      ),
     });
     setEditingId(tool.customToolId);
     setShowForm(true);
@@ -282,6 +363,42 @@ export function ToolManager() {
       ? "The web address must start with https:// — caller details are sent to it."
       : null;
 
+  /**
+   * Bounds are re-stated here rather than only server-side so the owner is
+   * told at the moment they type, not after a round trip. The server is still
+   * the authority — this is the courtesy, not the check.
+   */
+  function boundsError(
+    raw: string,
+    min: number,
+    max: number,
+    tooSmall: string,
+    tooLarge: string
+  ): string | null {
+    if (raw.trim() === "") return null;
+    const value = Number(raw);
+    if (!Number.isInteger(value)) return "Enter a whole number.";
+    if (value < min) return tooSmall;
+    if (value > max) return tooLarge;
+    return null;
+  }
+
+  const timeoutError = boundsError(
+    draft.timeout_seconds,
+    MIN_TOOL_TIMEOUT_SECONDS,
+    MAX_TOOL_TIMEOUT_SECONDS,
+    "Give the tool at least 1 second to answer.",
+    `Wait at most ${MAX_TOOL_TIMEOUT_SECONDS} seconds — beyond that the caller is left in silence long enough to hang up.`
+  );
+
+  const rateLimitError = boundsError(
+    draft.rate_limit_per_minute,
+    MIN_TOOL_RATE_LIMIT_PER_MINUTE,
+    MAX_TOOL_RATE_LIMIT_PER_MINUTE,
+    "Allow the tool to be used at least once a minute, or turn it off instead.",
+    `Allow at most ${MAX_TOOL_RATE_LIMIT_PER_MINUTE} uses a minute.`
+  );
+
   const parameterError = (() => {
     const seen = new Set<string>();
     for (const p of draft.parameters) {
@@ -303,6 +420,8 @@ export function ToolManager() {
     !descriptionError &&
     !urlError &&
     !parameterError &&
+    !timeoutError &&
+    !rateLimitError &&
     draft.parameters.every((p) => p.name.trim() && p.description.trim()) &&
     !submitting;
 
@@ -321,6 +440,15 @@ export function ToolManager() {
           required: p.required,
           description: p.description.trim(),
         })),
+        // An emptied field means "use the default", not "use zero".
+        timeout_seconds:
+          draft.timeout_seconds.trim() === ""
+            ? DEFAULT_TOOL_TIMEOUT_SECONDS
+            : Number(draft.timeout_seconds),
+        rate_limit_per_minute:
+          draft.rate_limit_per_minute.trim() === ""
+            ? DEFAULT_TOOL_RATE_LIMIT_PER_MINUTE
+            : Number(draft.rate_limit_per_minute),
       };
 
       const res = await fetch(
@@ -467,19 +595,104 @@ export function ToolManager() {
                   Nothing — your agent can use this without asking the caller for anything.
                 </p>
               ) : (
-                <ul className="space-y-1.5">
-                  {tool.parameters.map((param) => (
-                    <li key={param.name} className="text-sm">
-                      <span className="font-medium">{humanize(param.name)}</span>
-                      <span className="text-muted-foreground">
-                        {" — "}
-                        {param.description} Collected as {describeType(param.type)},{" "}
-                        {param.required
-                          ? "and your agent will ask for it before continuing."
-                          : "and your agent can continue without it."}
-                      </span>
-                    </li>
-                  ))}
+                <ul className="space-y-2">
+                  {tool.parameters.map((param) => {
+                    const draftKey = `${tool.id}:${param.name}`;
+                    const draftValue = paramDrafts[draftKey];
+                    const dirty =
+                      draftValue !== undefined &&
+                      draftValue !== (param.descriptionOverride ?? "");
+
+                    return (
+                      <li
+                        key={param.name}
+                        className="rounded-md border border-border p-2.5"
+                      >
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-sm font-medium">
+                            {humanize(param.name)}
+                          </span>
+                          <Badge variant="outline" className="shrink-0">
+                            {param.required ? "Always asked" : "Optional"}
+                          </Badge>
+                          {!param.enabled && (
+                            <Badge
+                              variant="outline"
+                              className="shrink-0 text-muted-foreground"
+                            >
+                              Not collected
+                            </Badge>
+                          )}
+                        </div>
+
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {param.description} Collected as {describeType(param.type)},{" "}
+                          {param.required
+                            ? "and your agent will ask for it before continuing."
+                            : param.enabled
+                              ? "and your agent can continue without it."
+                              : "but your agent has been told not to ask for it."}
+                        </p>
+
+                        {/* Only pack tools get per-parameter editing. A custom
+                            tool's inputs are already the tenant's own words and
+                            are edited in the tool form, where the name and type
+                            can change too. */}
+                        {tool.source === "pack" && (
+                          <div className="mt-2.5 space-y-2">
+                            {param.canDisable && (
+                              <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Switch
+                                  size="sm"
+                                  checked={param.enabled}
+                                  disabled={isPending}
+                                  onCheckedChange={(checked: boolean) =>
+                                    void saveParameterOverrides(tool, param.name, {
+                                      enabled: checked,
+                                    })
+                                  }
+                                  aria-label={`Collect ${humanize(param.name)}`}
+                                />
+                                Ask the caller for this
+                              </label>
+                            )}
+
+                            <Input
+                              value={draftValue ?? param.descriptionOverride ?? ""}
+                              placeholder={param.defaultDescription ?? ""}
+                              disabled={isPending || !param.enabled}
+                              aria-label={`How your agent understands ${humanize(param.name)}`}
+                              className="text-sm"
+                              onChange={(e) =>
+                                setParamDrafts((prev) => ({
+                                  ...prev,
+                                  [draftKey]: e.target.value,
+                                }))
+                              }
+                            />
+                            <div className="flex flex-wrap items-center gap-2">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                disabled={!dirty || isPending}
+                                onClick={() =>
+                                  void saveParameterOverrides(tool, param.name, {
+                                    description: draftValue ?? "",
+                                  })
+                                }
+                              >
+                                Save wording
+                              </Button>
+                              <p className="text-xs text-muted-foreground">
+                                Leave empty to use the built-in wording. This changes how
+                                your agent asks — not what it sends.
+                              </p>
+                            </div>
+                          </div>
+                        )}
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>
@@ -492,6 +705,17 @@ export function ToolManager() {
                 </p>
               </div>
             )}
+
+            <div>
+              <p className="mb-1 text-xs font-medium text-muted-foreground">Limits</p>
+              <p className="text-sm text-muted-foreground">
+                Your agent waits up to {tool.timeoutSeconds} seconds for a reply before
+                giving up
+                {tool.rateLimitPerMinute === null
+                  ? ", and this built-in tool is limited automatically."
+                  : `, and can use this at most ${tool.rateLimitPerMinute} times a minute during one call.`}
+              </p>
+            </div>
 
             {tool.source === "pack" && (
               <div className="space-y-2">
@@ -664,6 +888,61 @@ export function ToolManager() {
                   </option>
                 ))}
               </select>
+            </div>
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="tool-timeout">How long to wait for a reply</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="tool-timeout"
+                  inputMode="numeric"
+                  className="w-24"
+                  value={draft.timeout_seconds}
+                  onChange={(e) =>
+                    setDraft((prev) => ({ ...prev, timeout_seconds: e.target.value }))
+                  }
+                />
+                <span className="text-sm text-muted-foreground">seconds</span>
+              </div>
+              {timeoutError ? (
+                <p className="text-xs text-destructive">{timeoutError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  If the address has not answered by then, your agent stops waiting and
+                  apologizes to the caller instead of leaving them in silence. Most tools
+                  answer well inside {DEFAULT_TOOL_TIMEOUT_SECONDS} seconds.
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-1.5">
+              <Label htmlFor="tool-rate-limit">How often it can be used</Label>
+              <div className="flex items-center gap-2">
+                <Input
+                  id="tool-rate-limit"
+                  inputMode="numeric"
+                  className="w-24"
+                  value={draft.rate_limit_per_minute}
+                  onChange={(e) =>
+                    setDraft((prev) => ({
+                      ...prev,
+                      rate_limit_per_minute: e.target.value,
+                    }))
+                  }
+                />
+                <span className="text-sm text-muted-foreground">times a minute</span>
+              </div>
+              {rateLimitError ? (
+                <p className="text-xs text-destructive">{rateLimitError}</p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  A safety net, counted per call. If your agent ever gets stuck repeating
+                  itself, this stops it flooding your system. Normal calls use a tool a
+                  handful of times.
+                </p>
+              )}
             </div>
           </div>
 

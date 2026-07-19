@@ -3951,6 +3951,8 @@ export interface Database {
           tool_id: string;
           enabled: boolean;
           description_override: string | null;
+          /** Sparse map of parameter name -> { description?, enabled? }. */
+          parameter_overrides: Json;
           created_at: string;
           updated_at: string;
         };
@@ -3960,6 +3962,7 @@ export interface Database {
           tool_id: string;
           enabled?: boolean;
           description_override?: string | null;
+          parameter_overrides?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -3969,6 +3972,7 @@ export interface Database {
           tool_id?: string;
           enabled?: boolean;
           description_override?: string | null;
+          parameter_overrides?: Json;
           created_at?: string;
           updated_at?: string;
         };
@@ -3984,6 +3988,10 @@ export interface Database {
           http_url: string;
           http_method: string;
           enabled: boolean;
+          /** Seconds the agent waits for this tool before giving up. 1-120. */
+          timeout_seconds: number;
+          /** Invocations allowed per minute, per call. 1-600. */
+          rate_limit_per_minute: number;
           created_at: string;
           updated_at: string;
         };
@@ -3996,6 +4004,8 @@ export interface Database {
           http_url: string;
           http_method?: string;
           enabled?: boolean;
+          timeout_seconds?: number;
+          rate_limit_per_minute?: number;
           created_at?: string;
           updated_at?: string;
         };
@@ -4008,14 +4018,171 @@ export interface Database {
           http_url?: string;
           http_method?: string;
           enabled?: boolean;
+          timeout_seconds?: number;
+          rate_limit_per_minute?: number;
           created_at?: string;
           updated_at?: string;
         };
         Relationships: [];
       };
+      campaigns: {
+        Row: {
+          id: string;
+          tenant_id: string;
+          name: string;
+          call_type_id: string;
+          /** draft | running | paused | completed | cancelled */
+          status: string;
+          max_concurrent_calls: number;
+          calls_per_minute: number;
+          /** Local wall-clock TIME, e.g. "09:00:00" — zone is the CALLEE's. */
+          calling_window_start: string;
+          calling_window_end: string;
+          max_attempts: number;
+          retry_delay_minutes: number;
+          /** Campaign-wide prompt variables; per-target values override these. */
+          variables: Json;
+          created_by: string | null;
+          started_at: string | null;
+          completed_at: string | null;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          tenant_id: string;
+          name: string;
+          call_type_id: string;
+          status?: string;
+          max_concurrent_calls?: number;
+          calls_per_minute?: number;
+          calling_window_start?: string;
+          calling_window_end?: string;
+          max_attempts?: number;
+          retry_delay_minutes?: number;
+          variables?: Json;
+          created_by?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          tenant_id?: string;
+          name?: string;
+          call_type_id?: string;
+          status?: string;
+          max_concurrent_calls?: number;
+          calls_per_minute?: number;
+          calling_window_start?: string;
+          calling_window_end?: string;
+          max_attempts?: number;
+          retry_delay_minutes?: number;
+          variables?: Json;
+          created_by?: string | null;
+          started_at?: string | null;
+          completed_at?: string | null;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "campaigns_tenant_id_fkey";
+            columns: ["tenant_id"];
+            isOneToOne: false;
+            referencedRelation: "tenants";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
+      campaign_targets: {
+        Row: {
+          id: string;
+          campaign_id: string;
+          contact_id: string | null;
+          phone: string;
+          /** queued | dialing | done | failed | opted_out | skipped */
+          state: string;
+          attempts: number;
+          last_attempt_at: string | null;
+          /** null = due now; set by retry backoff and calling-window deferral. */
+          next_attempt_at: string | null;
+          call_id: string | null;
+          failure_reason: string | null;
+          variables: Json;
+          created_at: string;
+          updated_at: string;
+        };
+        Insert: {
+          id?: string;
+          campaign_id: string;
+          contact_id?: string | null;
+          phone: string;
+          state?: string;
+          attempts?: number;
+          last_attempt_at?: string | null;
+          next_attempt_at?: string | null;
+          call_id?: string | null;
+          failure_reason?: string | null;
+          variables?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Update: {
+          id?: string;
+          campaign_id?: string;
+          contact_id?: string | null;
+          phone?: string;
+          state?: string;
+          attempts?: number;
+          last_attempt_at?: string | null;
+          next_attempt_at?: string | null;
+          call_id?: string | null;
+          failure_reason?: string | null;
+          variables?: Json;
+          created_at?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: "campaign_targets_campaign_id_fkey";
+            columns: ["campaign_id"];
+            isOneToOne: false;
+            referencedRelation: "campaigns";
+            referencedColumns: ["id"];
+          },
+          {
+            foreignKeyName: "campaign_targets_contact_id_fkey";
+            columns: ["contact_id"];
+            isOneToOne: false;
+            referencedRelation: "contacts";
+            referencedColumns: ["id"];
+          },
+        ];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      /**
+       * Atomically claims up to `p_limit` due targets for one campaign,
+       * flipping them 'queued' -> 'dialing' in a single UPDATE ... FOR UPDATE
+       * SKIP LOCKED statement. Overlapping dialer ticks receive disjoint sets.
+       * See migration 014.
+       */
+      claim_campaign_targets: {
+        Args: { p_campaign_id: string; p_limit: number };
+        Returns: Database["public"]["Tables"]["campaign_targets"]["Row"][];
+      };
+      /**
+       * Returns targets abandoned in 'dialing' by a crashed tick back to
+       * 'queued', charging one attempt. Returns how many were released.
+       */
+      release_stale_campaign_targets: {
+        Args: { p_stale_minutes?: number };
+        Returns: number;
+      };
+    };
     Enums: Record<string, never>;
   };
 }

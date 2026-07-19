@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@/lib/database/supabase-server";
 import { createAdminClient } from "@/lib/database/supabase-admin";
 import { getCurrentTenantId } from "@/domain/tenants/current";
-import { validateCustomTool } from "@/lib/validation/agent-tools";
+import {
+  DEFAULT_TOOL_RATE_LIMIT_PER_MINUTE,
+  DEFAULT_TOOL_TIMEOUT_SECONDS,
+  validateCustomTool,
+} from "@/lib/validation/agent-tools";
 import "@/industries";
 import { getIndustryPack } from "@/industries/core/registry";
 import type { IndustryId, ToolParameter } from "@/industries/core/industry-pack";
@@ -22,7 +26,19 @@ export interface ToolParameterView {
   name: string;
   type: ToolParameter["type"];
   required: boolean;
+  /** What the agent is told this input collects, after any override. */
   description: string;
+  /** The pack's original wording, so the UI can offer "reset to default". */
+  defaultDescription: string | null;
+  descriptionOverride: string | null;
+  /**
+   * Whether the agent collects this at all. Always true for a required
+   * parameter and for every custom-tool parameter — only an OPTIONAL pack
+   * parameter can be switched off.
+   */
+  enabled: boolean;
+  /** False when the UI must not offer the on/off switch (required inputs). */
+  canDisable: boolean;
 }
 
 export interface EffectiveTool {
@@ -46,6 +62,14 @@ export interface EffectiveTool {
   httpMethod: string | null;
   /** Custom tools only — the row id, needed to edit or delete it. */
   customToolId: string | null;
+  /**
+   * Runtime limits. Custom tools carry the tenant's stored values; pack tools
+   * report what their binding declares (falling back to the same defaults), so
+   * the UI can show that a built-in tool is bounded too rather than implying
+   * only custom tools have limits.
+   */
+  timeoutSeconds: number;
+  rateLimitPerMinute: number | null;
 }
 
 function parseParameters(raw: unknown): ToolParameterView[] {
@@ -63,9 +87,34 @@ function parseParameters(raw: unknown): ToolParameterView[] {
         type: known ? type : ("string" as const),
         required: record.required === true,
         description: record.description,
+        // A custom tool's parameters ARE the tenant's own wording already —
+        // there is no pack default to diverge from and nothing to override, so
+        // they are edited through the tool form rather than per-parameter.
+        defaultDescription: null,
+        descriptionOverride: null,
+        enabled: true,
+        canDisable: false,
       },
     ];
   });
+}
+
+/** Narrows the JSONB `parameter_overrides` column to a name-keyed map. */
+function parseParameterOverrides(
+  raw: unknown
+): Record<string, { description?: string; enabled?: boolean }> {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+
+  const parsed: Record<string, { description?: string; enabled?: boolean }> = {};
+  for (const [name, value] of Object.entries(raw as Record<string, unknown>)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) continue;
+    const entry = value as Record<string, unknown>;
+    parsed[name] = {
+      ...(typeof entry.description === "string" ? { description: entry.description } : {}),
+      ...(typeof entry.enabled === "boolean" ? { enabled: entry.enabled } : {}),
+    };
+  }
+  return parsed;
 }
 
 /** Resolves the caller to a tenant, or explains why not. */
@@ -109,11 +158,13 @@ export async function GET() {
     const [{ data: settingRows }, { data: customRows }] = await Promise.all([
       admin
         .from("agent_tool_settings")
-        .select("tool_id, enabled, description_override")
+        .select("tool_id, enabled, description_override, parameter_overrides")
         .eq("tenant_id", tenantId),
       admin
         .from("custom_tools")
-        .select("id, name, description, parameters, http_url, http_method, enabled")
+        .select(
+          "id, name, description, parameters, http_url, http_method, enabled, timeout_seconds, rate_limit_per_minute"
+        )
         .eq("tenant_id", tenantId)
         .order("created_at", { ascending: true }),
     ]);
@@ -121,7 +172,11 @@ export async function GET() {
     const overrides = new Map(
       (settingRows ?? []).map((row) => [
         row.tool_id,
-        { enabled: row.enabled, descriptionOverride: row.description_override },
+        {
+          enabled: row.enabled,
+          descriptionOverride: row.description_override,
+          parameterOverrides: parseParameterOverrides(row.parameter_overrides),
+        },
       ])
     );
 
@@ -137,17 +192,34 @@ export async function GET() {
         description: descriptionOverride ?? binding.description,
         defaultDescription: binding.description,
         descriptionOverride,
-        parameters: binding.parameters.map((param) => ({
-          name: param.name,
-          type: param.type,
-          required: param.required,
-          description: param.description,
-        })),
+        parameters: binding.parameters.map((param) => {
+          const paramOverride = override?.parameterOverrides?.[param.name];
+          const reworded = paramOverride?.description?.trim() ? paramOverride.description : null;
+          return {
+            name: param.name,
+            type: param.type,
+            required: param.required,
+            description: reworded ?? param.description,
+            defaultDescription: param.description,
+            descriptionOverride: reworded,
+            // A required parameter is always collected — see
+            // validateParameterOverrides for why switching one off is refused.
+            enabled: param.required || paramOverride?.enabled !== false,
+            canDisable: !param.required,
+          };
+        }),
         intentIds: binding.intentIds,
         returnType: binding.returnType,
         httpUrl: null,
         httpMethod: null,
         customToolId: null,
+        timeoutSeconds: binding.timeout
+          ? Math.round(binding.timeout / 1000)
+          : DEFAULT_TOOL_TIMEOUT_SECONDS,
+        // Pack tools have no per-tenant rate setting to show. `rateLimit` on
+        // the binding is per-tool-per-window rather than per-minute-per-call,
+        // so reporting it here as if it were the same number would be a lie.
+        rateLimitPerMinute: null,
       };
     });
 
@@ -165,6 +237,8 @@ export async function GET() {
       httpUrl: row.http_url,
       httpMethod: row.http_method,
       customToolId: row.id,
+      timeoutSeconds: row.timeout_seconds ?? DEFAULT_TOOL_TIMEOUT_SECONDS,
+      rateLimitPerMinute: row.rate_limit_per_minute ?? DEFAULT_TOOL_RATE_LIMIT_PER_MINUTE,
     }));
 
     return NextResponse.json({
@@ -215,6 +289,8 @@ export async function POST(request: NextRequest) {
         http_url: tool.http_url,
         http_method: tool.http_method,
         enabled: tool.enabled,
+        timeout_seconds: tool.timeout_seconds,
+        rate_limit_per_minute: tool.rate_limit_per_minute,
       })
       .select("id, name")
       .single();
@@ -246,6 +322,8 @@ export async function POST(request: NextRequest) {
         http_method: tool.http_method,
         parameter_count: tool.parameters.length,
         enabled: tool.enabled,
+        timeout_seconds: tool.timeout_seconds,
+        rate_limit_per_minute: tool.rate_limit_per_minute,
       },
     });
 

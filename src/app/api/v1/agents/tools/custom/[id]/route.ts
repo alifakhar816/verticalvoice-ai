@@ -93,6 +93,12 @@ export async function PATCH(
         ...(patch.http_url !== undefined ? { http_url: patch.http_url } : {}),
         ...(patch.http_method !== undefined ? { http_method: patch.http_method } : {}),
         ...(patch.enabled !== undefined ? { enabled: patch.enabled } : {}),
+        ...(patch.timeout_seconds !== undefined
+          ? { timeout_seconds: patch.timeout_seconds }
+          : {}),
+        ...(patch.rate_limit_per_minute !== undefined
+          ? { rate_limit_per_minute: patch.rate_limit_per_minute }
+          : {}),
         updated_at: new Date().toISOString(),
       })
       .eq("id", id)

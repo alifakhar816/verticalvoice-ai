@@ -1,11 +1,13 @@
 import { beforeEach, afterEach, describe, expect, it } from "vitest";
 import {
   buildSelectedTools,
+  type CustomToolDefinition,
   type TenantToolSettings,
 } from "@/lib/telephony/ultravox-tools";
 import {
   validateCustomTool,
   validateCustomToolUpdate,
+  validateParameterOverrides,
   validateToolSettingsPatch,
 } from "@/lib/validation/agent-tools";
 import type { IndustryPack } from "@/industries/core/industry-pack";
@@ -27,6 +29,14 @@ const pack = {
       parameters: [
         { name: "date", type: "string", required: true, description: "Date to check." },
         { name: "party_size", type: "number", required: true, description: "Number of guests." },
+        // Optional on purpose: the only kind of parameter a tenant is allowed
+        // to stop collecting.
+        {
+          name: "seating_preference",
+          type: "string",
+          required: false,
+          description: "Indoor or outdoor, if the caller says.",
+        },
       ],
       returnType: "{ available: boolean }",
       requiresAuth: true,
@@ -53,12 +63,36 @@ const opts = {
 
 const noSettings: TenantToolSettings = { packOverrides: {}, customTools: [] };
 
+/**
+ * A custom tool with the runtime limits filled in, so a test that cares about
+ * routing does not have to restate a timeout it is not testing.
+ */
+function customTool(
+  overrides: Partial<CustomToolDefinition> & Pick<CustomToolDefinition, "name">
+): CustomToolDefinition {
+  return {
+    id: "aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa",
+    description: "A tenant-authored tool.",
+    parameters: [],
+    http_url: "https://api.partner.example.com/orders",
+    http_method: "POST",
+    timeout_seconds: 20,
+    rate_limit_per_minute: 30,
+    ...overrides,
+  };
+}
+
 interface TemporaryToolEntry {
   temporaryTool?: {
     modelToolName: string;
     description: string;
-    dynamicParameters: { name: string; required: boolean; schema: { type: string } }[];
+    dynamicParameters: {
+      name: string;
+      required: boolean;
+      schema: { type: string; description: string };
+    }[];
     staticParameters?: { name: string; value: string }[];
+    timeout?: string;
     http: { baseUrlPattern: string; httpMethod: string };
   };
   toolName?: string;
@@ -163,7 +197,8 @@ describe("buildSelectedTools", () => {
     const entries = build({
       packOverrides: {},
       customTools: [
-        {
+        customTool({
+          id: "bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb",
           name: "check_order_status",
           description: "Look up an order by its reference.",
           parameters: [
@@ -174,19 +209,13 @@ describe("buildSelectedTools", () => {
               description: "The order reference.",
             },
           ],
-          http_url: "https://api.partner.example.com/orders",
-          http_method: "POST",
-        },
+        }),
       ],
     });
 
     const custom = entries.find((e) => e.temporaryTool?.modelToolName === "check_order_status");
     expect(custom).toBeDefined();
     expect(custom?.temporaryTool?.description).toBe("Look up an order by its reference.");
-    expect(custom?.temporaryTool?.http).toEqual({
-      baseUrlPattern: "https://api.partner.example.com/orders",
-      httpMethod: "POST",
-    });
     expect(custom?.temporaryTool?.dynamicParameters).toEqual([
       {
         name: "order_id",
@@ -197,67 +226,173 @@ describe("buildSelectedTools", () => {
     ]);
   });
 
-  it("does NOT send our internal tool token to a third-party endpoint", () => {
-    // The token authenticates requests to /api/v1/tools/execute as this tenant.
-    // Handing it to an arbitrary host the tenant typed in would be a credential
-    // leak, so a non-same-origin custom tool carries no staticParameters at all.
+  it("points a custom tool at our own proxy, never at the tenant's host", () => {
+    // This is what makes rate limiting possible at all: if Ultravox dialled
+    // `http_url` directly the traffic would never cross our infrastructure and
+    // there would be nothing to count. The tenant's host is reached on the
+    // outbound leg by /api/v1/tools/custom/[id], not by Ultravox.
     const entries = build({
       packOverrides: {},
       customTools: [
-        {
+        customTool({
+          id: "cccccccc-cccc-cccc-cccc-cccccccccccc",
           name: "third_party_lookup",
-          description: "Calls someone else's API.",
-          parameters: [],
           http_url: "https://evil.example.net/collect",
-          http_method: "POST",
-        },
+          http_method: "PUT",
+        }),
       ],
     });
 
     const custom = entries.find((e) => e.temporaryTool?.modelToolName === "third_party_lookup");
-    expect(custom?.temporaryTool?.staticParameters).toBeUndefined();
+    expect(custom?.temporaryTool?.http).toEqual({
+      baseUrlPattern: `${APP_URL}/api/v1/tools/custom/cccccccc-cccc-cccc-cccc-cccccccccccc`,
+      // Always POST to the proxy: Ultravox can only send collected inputs as a
+      // body, so a GET/PUT here would drop them. The row's own method is
+      // applied by the proxy on the outbound leg.
+      httpMethod: "POST",
+    });
 
-    const serialized = JSON.stringify(custom);
-    expect(serialized).not.toContain("Authorization");
-    expect(serialized).not.toContain("Bearer");
+    // The tenant's host must not appear in the definition Ultravox holds.
+    expect(JSON.stringify(custom)).not.toContain("evil.example.net");
   });
 
-  it("does send the token to a same-origin custom tool", () => {
+  it("keeps our internal tool token on our own origin", () => {
+    // The token authenticates as this tenant against our API. It is attached
+    // here because the address it is attached to is now always ours; the
+    // decision about whether it travels any further is made by the proxy,
+    // which forwards it only for a same-origin http_url.
     const entries = build({
       packOverrides: {},
       customTools: [
-        {
-          name: "internal_lookup",
-          description: "Routes back through our own API.",
-          parameters: [],
-          http_url: `${APP_URL}/api/v1/tools/execute/internal_lookup`,
-          http_method: "POST",
-        },
+        customTool({ name: "third_party_lookup", http_url: "https://evil.example.net/collect" }),
       ],
     });
 
-    const custom = entries.find((e) => e.temporaryTool?.modelToolName === "internal_lookup");
+    const custom = entries.find((e) => e.temporaryTool?.modelToolName === "third_party_lookup");
     expect(custom?.temporaryTool?.staticParameters?.[0]?.name).toBe("Authorization");
-    expect(custom?.temporaryTool?.staticParameters?.[0]?.value).toMatch(/^Bearer .+/);
+    expect(custom?.temporaryTool?.http.baseUrlPattern.startsWith(APP_URL)).toBe(true);
   });
 
-  it("treats a lookalike host as third-party, not same-origin", () => {
-    // `startsWith` on the base URL would wrongly accept this.
+  it("gives a custom tool the timeout the tenant configured", () => {
     const entries = build({
       packOverrides: {},
-      customTools: [
-        {
-          name: "lookalike",
-          description: "Host that merely starts with our app URL.",
-          parameters: [],
-          http_url: "https://app.example.com.attacker.net/collect",
-          http_method: "POST",
-        },
-      ],
+      customTools: [customTool({ name: "slow_lookup", timeout_seconds: 45 })],
     });
 
-    const custom = entries.find((e) => e.temporaryTool?.modelToolName === "lookalike");
-    expect(custom?.temporaryTool?.staticParameters).toBeUndefined();
+    const custom = entries.find((e) => e.temporaryTool?.modelToolName === "slow_lookup");
+    expect(custom?.temporaryTool?.timeout).toBe("45s");
+  });
+
+  it("bounds a pack tool with the timeout its binding declares", () => {
+    // The packs have carried `timeout` since they were written and nothing
+    // read it — a slow built-in tool could hold a call open indefinitely.
+    const timedPack = {
+      id: "restaurant",
+      tools: [
+        {
+          ...(pack.tools[0] as unknown as Record<string, unknown>),
+          timeout: 5000,
+        },
+      ],
+    } as unknown as IndustryPack;
+
+    const entries = buildSelectedTools(timedPack, opts, noSettings) as TemporaryToolEntry[];
+    expect(entries[0]?.temporaryTool?.timeout).toBe("5s");
+  });
+
+  it("falls back to the default timeout for a binding that declares none", () => {
+    // No pack tool may be unbounded just because its author omitted a number.
+    const entries = build();
+    expect(entries[0]?.temporaryTool?.timeout).toBe("20s");
+  });
+
+  it("rewords a pack parameter's description without touching its contract", () => {
+    const entries = build({
+      packOverrides: {
+        check_table_availability: {
+          enabled: true,
+          descriptionOverride: null,
+          parameterOverrides: {
+            party_size: { description: "How many people are dining with us." },
+          },
+        },
+      },
+      customTools: [],
+    });
+
+    const tool = entries.find(
+      (e) => e.temporaryTool?.modelToolName === "check_table_availability"
+    );
+    const partySize = tool?.temporaryTool?.dynamicParameters.find(
+      (p) => p.name === "party_size"
+    );
+
+    expect(partySize?.schema.description).toBe("How many people are dining with us.");
+    // The three fields a handler depends on are unchanged.
+    expect(partySize?.name).toBe("party_size");
+    expect(partySize?.schema.type).toBe("number");
+    expect(partySize?.required).toBe(true);
+  });
+
+  it("falls back to the pack wording when a parameter override is blank", () => {
+    const entries = build({
+      packOverrides: {
+        check_table_availability: {
+          enabled: true,
+          descriptionOverride: null,
+          parameterOverrides: { party_size: { description: "   " } },
+        },
+      },
+      customTools: [],
+    });
+
+    const partySize = entries
+      .find((e) => e.temporaryTool?.modelToolName === "check_table_availability")
+      ?.temporaryTool?.dynamicParameters.find((p) => p.name === "party_size");
+
+    expect(partySize?.schema.description).toBe("Number of guests.");
+  });
+
+  it("drops an OPTIONAL parameter the tenant stopped collecting", () => {
+    const entries = build({
+      packOverrides: {
+        check_table_availability: {
+          enabled: true,
+          descriptionOverride: null,
+          parameterOverrides: { seating_preference: { enabled: false } },
+        },
+      },
+      customTools: [],
+    });
+
+    const names = entries
+      .find((e) => e.temporaryTool?.modelToolName === "check_table_availability")
+      ?.temporaryTool?.dynamicParameters.map((p) => p.name);
+
+    expect(names).not.toContain("seating_preference");
+    expect(names).toContain("date");
+  });
+
+  it("keeps a REQUIRED parameter even if a stored override says otherwise", () => {
+    // The API layer refuses to write this, but a row could arrive by another
+    // path. Honouring it would produce a handler that throws mid-call on a
+    // real caller, so the builder refuses it too — defence in depth.
+    const entries = build({
+      packOverrides: {
+        check_table_availability: {
+          enabled: true,
+          descriptionOverride: null,
+          parameterOverrides: { date: { enabled: false } },
+        },
+      },
+      customTools: [],
+    });
+
+    const names = entries
+      .find((e) => e.temporaryTool?.modelToolName === "check_table_availability")
+      ?.temporaryTool?.dynamicParameters.map((p) => p.name);
+
+    expect(names).toContain("date");
   });
 
   it("still attaches the token to pack tools, which are always same-origin", () => {
@@ -413,5 +548,133 @@ describe("validateToolSettingsPatch", () => {
     const result = validateToolSettingsPatch({});
     expect(result.ok).toBe(false);
     if (!result.ok) expect(result.message).toMatch(/Nothing was changed/);
+  });
+
+  it("accepts a parameter override on its own", () => {
+    expect(
+      validateToolSettingsPatch({
+        parameter_overrides: { party_size: { description: "How many are dining." } },
+      }).ok
+    ).toBe(true);
+  });
+
+  it("refuses a parameter override that tries to change the contract", () => {
+    // `required`, `name` and `type` are what the handlers read by name. The
+    // schema is strict so an attempt to smuggle one through is a 400, not a
+    // silently ignored field.
+    for (const forbidden of [
+      { party_size: { required: false } },
+      { party_size: { name: "guests" } },
+      { party_size: { type: "string" } },
+    ]) {
+      expect(validateToolSettingsPatch({ parameter_overrides: forbidden }).ok).toBe(false);
+    }
+  });
+});
+
+describe("validateParameterOverrides", () => {
+  const parameters = [
+    { name: "date", required: true },
+    { name: "seating_preference", required: false },
+  ];
+
+  it("accepts rewording either kind of parameter", () => {
+    const result = validateParameterOverrides(
+      {
+        date: { description: "The day they want to come in." },
+        seating_preference: { description: "Indoor or outdoor." },
+      },
+      parameters
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("accepts switching an OPTIONAL parameter off", () => {
+    const result = validateParameterOverrides(
+      { seating_preference: { enabled: false } },
+      parameters
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("refuses switching a REQUIRED parameter off", () => {
+    // This is the whole safety boundary: the handler reads `date`
+    // unconditionally, so an agent that never collected it fails mid-call.
+    const result = validateParameterOverrides({ date: { enabled: false } }, parameters);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.message).toMatch(/required/i);
+      expect(result.message).toContain("date");
+    }
+  });
+
+  it("still allows rewording a required parameter", () => {
+    const result = validateParameterOverrides(
+      { date: { description: "The day they want to come in." } },
+      parameters
+    );
+    expect(result.ok).toBe(true);
+  });
+
+  it("refuses an override for a parameter the tool does not have", () => {
+    const result = validateParameterOverrides({ nonsense: { enabled: false } }, parameters);
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.message).toContain("nonsense");
+  });
+});
+
+describe("custom tool limits", () => {
+  const base = {
+    name: "check_order_status",
+    description: "Look up the status of a customer order using their reference number.",
+    parameters: [],
+    http_url: "https://api.example.com/orders",
+    http_method: "POST",
+  };
+
+  it("defaults both limits when the tenant does not set them", () => {
+    const result = validateCustomTool(base);
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.value.timeout_seconds).toBe(20);
+      expect(result.value.rate_limit_per_minute).toBe(30);
+    }
+  });
+
+  it("accepts values inside the bounds", () => {
+    const result = validateCustomTool({
+      ...base,
+      timeout_seconds: 45,
+      rate_limit_per_minute: 5,
+    });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.timeout_seconds).toBe(45);
+  });
+
+  it("refuses a timeout long enough to strand the caller", () => {
+    const result = validateCustomTool({ ...base, timeout_seconds: 600 });
+    expect(result.ok).toBe(false);
+    // Phrased for a business owner, not as a schema violation.
+    if (!result.ok) expect(result.message).not.toMatch(/zod|number|invalid_/i);
+  });
+
+  it("refuses a zero or negative timeout", () => {
+    expect(validateCustomTool({ ...base, timeout_seconds: 0 }).ok).toBe(false);
+    expect(validateCustomTool({ ...base, timeout_seconds: -5 }).ok).toBe(false);
+  });
+
+  it("refuses a rate limit outside the bounds", () => {
+    expect(validateCustomTool({ ...base, rate_limit_per_minute: 0 }).ok).toBe(false);
+    expect(validateCustomTool({ ...base, rate_limit_per_minute: 100_000 }).ok).toBe(false);
+  });
+
+  it("refuses a fractional limit", () => {
+    expect(validateCustomTool({ ...base, timeout_seconds: 2.5 }).ok).toBe(false);
+  });
+
+  it("lets an existing tool change just its limits", () => {
+    const result = validateCustomToolUpdate({ timeout_seconds: 10 });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.value.timeout_seconds).toBe(10);
   });
 });
