@@ -20,6 +20,34 @@ const ONBOARDING_VOICE_TO_ULTRAVOX_ID: Record<string, string> = {
   noah: '199c9635-edbe-4f9c-a626-ca31fb151d15', // Troy — natural, approachable American male
 };
 
+/**
+ * Models Ultravox actually serves (`GET /api/models`). Anything else 400s the
+ * call outright: "Model `gpt-4o` does not exist".
+ */
+export const ULTRAVOX_MODELS = [
+  'ultravox-v0.7',
+  'ultravox-v0.6',
+  'ultravox-v0.6-llama3.3-70b',
+  'ultravox-v0.6-gemma3-27b',
+] as const;
+
+/**
+ * Drops a model Ultravox does not serve instead of forwarding it.
+ *
+ * Onboarding wrote `model: "gpt-4o"` into the config snapshot — an OpenAI name
+ * that was harmless only because we never sent the field. Now that we do, a
+ * legacy value would fail every call for that tenant. Falling back to the
+ * Ultravox default keeps calls connecting while the stored value is corrected.
+ */
+function resolveModel(model: string | null | undefined): string | null {
+  if (!model) return null;
+  if ((ULTRAVOX_MODELS as readonly string[]).includes(model)) return model;
+  console.warn(
+    `[ultravox] ignoring unsupported model "${model}" — falling back to the Ultravox default`
+  );
+  return null;
+}
+
 function resolveUltravoxVoiceId(voiceId: string | null): string | null {
   if (!voiceId) return null;
   return ONBOARDING_VOICE_TO_ULTRAVOX_ID[voiceId] ?? voiceId;
@@ -172,7 +200,7 @@ export async function createUltravoxCall(
         ? { temperature: options.temperature }
         : {}),
       ...(options?.language ? { languageHint: options.language } : {}),
-      ...(options?.model ? { model: options.model } : {}),
+      ...(resolveModel(options?.model) ? { model: resolveModel(options?.model) } : {}),
       ...(voiceOverrides ? { voiceOverrides } : {}),
     }),
   });
