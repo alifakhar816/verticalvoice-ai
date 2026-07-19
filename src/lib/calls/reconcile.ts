@@ -163,7 +163,13 @@ export async function reconcileActiveCalls(
   supabase: SupabaseClient<Database>,
   tenantId?: string
 ): Promise<{ checked: number; updated: number }> {
-  const sixHoursAgo = new Date(Date.now() - 6 * 60 * 60 * 1000).toISOString();
+  // Seven days, not six hours. The filter below keeps only calls actually
+  // missing derived data, so a wider window costs nothing on a healthy system
+  // but lets a backfill reach calls that completed before a feature shipped —
+  // which is exactly how costs ended up permanently absent.
+  const backfillWindowStart = new Date(
+    Date.now() - 7 * 24 * 60 * 60 * 1000
+  ).toISOString();
 
   const activeQuery = supabase
     .from("calls")
@@ -179,7 +185,7 @@ export async function reconcileActiveCalls(
     .select("id, tenant_id, ultravox_call_id, status, recording_url, direction, caller_number, called_number")
     .not("ultravox_call_id", "is", null)
     .eq("status", "completed")
-    .gte("started_at", sixHoursAgo)
+    .gte("started_at", backfillWindowStart)
     .limit(200);
 
   if (tenantId) {
@@ -197,20 +203,28 @@ export async function reconcileActiveCalls(
   const completedIds = completed.map((c) => c.id);
   let needsReconcile = completed;
   if (completedIds.length > 0) {
-    const [{ data: sums }, { data: outs }, { data: evals }] = await Promise.all([
-      supabase.from("call_summaries").select("call_id").in("call_id", completedIds),
-      supabase.from("call_outcomes").select("call_id").in("call_id", completedIds),
-      supabase.from("call_evaluations").select("call_id").in("call_id", completedIds),
-    ]);
+    const [{ data: sums }, { data: outs }, { data: evals }, { data: costs }] =
+      await Promise.all([
+        supabase.from("call_summaries").select("call_id").in("call_id", completedIds),
+        supabase.from("call_outcomes").select("call_id").in("call_id", completedIds),
+        supabase.from("call_evaluations").select("call_id").in("call_id", completedIds),
+        supabase.from("call_costs").select("call_id").in("call_id", completedIds),
+      ]);
     const haveSummary = new Set((sums ?? []).map((s) => s.call_id));
     const haveOutcome = new Set((outs ?? []).map((o) => o.call_id));
     const haveEvaluation = new Set((evals ?? []).map((e) => e.call_id));
+    // Costing shipped after some calls had already been fully reconciled. Those
+    // satisfied every other check, so the sweep skipped them and their detail
+    // page sat on "Calculating…" forever — worse than the old "N/A", because it
+    // implies work still in progress.
+    const haveCost = new Set((costs ?? []).map((c) => c.call_id));
     needsReconcile = completed.filter(
       (c) =>
         !c.recording_url ||
         !haveSummary.has(c.id) ||
         !haveOutcome.has(c.id) ||
-        !haveEvaluation.has(c.id)
+        !haveEvaluation.has(c.id) ||
+        !haveCost.has(c.id)
     );
   }
 
