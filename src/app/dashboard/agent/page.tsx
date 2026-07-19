@@ -5,7 +5,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Separator } from "@/components/ui/separator";
 import {
   Bot,
   Volume2,
@@ -13,9 +12,6 @@ import {
   Hash,
   Clock,
   Package,
-  Mic,
-  Gauge,
-  MessageSquare,
   CheckCircle2,
   ShieldCheck,
 } from "lucide-react";
@@ -24,6 +20,9 @@ import { getCurrentTenantId } from "@/domain/tenants/current";
 import { getAgentConfig } from "@/domain/agents/service";
 import { LiveCallOrb } from "@/components/shared/live-call-orb";
 import { SystemPromptEditor } from "./system-prompt-editor";
+import { VoiceStudio } from "./voice-studio";
+import { EngineConfig } from "./engine-config";
+import { ToolManager } from "./tool-manager";
 import type { Json } from "@/lib/database/types";
 
 interface AgentSnapshot {
@@ -47,19 +46,6 @@ function asAgentSnapshot(snapshot: Json): AgentSnapshot {
     return snapshot as AgentSnapshot;
   }
   return {};
-}
-
-function toolList(tools: Json | undefined): string[] {
-  if (!Array.isArray(tools)) return [];
-  return tools.map((tool, i) => {
-    if (tool && typeof tool === "object" && !Array.isArray(tool)) {
-      const record = tool as Record<string, Json | undefined>;
-      const name = record.name ?? record.type;
-      if (typeof name === "string") return name;
-    }
-    if (typeof tool === "string") return tool;
-    return `Tool ${i + 1}`;
-  });
 }
 
 function formatDate(iso: string | undefined | null): string {
@@ -91,9 +77,10 @@ function verticalMeta(
 function SectionNav() {
   const items = [
     { id: "overview", label: "Overview" },
-    { id: "voice", label: "Voice & Tone" },
-    { id: "tools", label: "Tools" },
-    { id: "policy", label: "Policy & Behavior" },
+    { id: "voice", label: "Voice" },
+    { id: "tools", label: "Engine" },
+    { id: "tools-manager", label: "Tools" },
+    { id: "policy", label: "Instructions" },
   ];
   return (
     <nav
@@ -206,7 +193,6 @@ export default async function AgentPage() {
   ]);
 
   const snapshot = versionRow ? asAgentSnapshot(versionRow.snapshot) : {};
-  const tools = toolList(snapshot.tools);
   const vertical = verticalMeta(tenant?.industry);
   const accent = vertical ? `var(${vertical.varName})` : "var(--brand)";
 
@@ -307,48 +293,7 @@ export default async function AgentPage() {
               <LiveCallOrb size="md" state="live" accent={accent} showTimer={false} />
             </div>
 
-            {snapshot.voice ? (
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Mic className="size-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Provider</span>
-                  </div>
-                  <span className="text-sm font-medium capitalize">
-                    {snapshot.voice.provider ?? "Not set"}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <MessageSquare className="size-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Voice ID</span>
-                  </div>
-                  <span className="font-mono text-sm font-medium">
-                    {snapshot.voice.voice_id ?? "Not set"}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Gauge className="size-4 text-muted-foreground" />
-                    <span className="text-sm text-muted-foreground">Speed</span>
-                  </div>
-                  <span className="font-mono text-sm font-medium tabular-nums">
-                    {snapshot.voice.speed != null ? `${snapshot.voice.speed}x` : "Default"}
-                  </span>
-                </div>
-                <Separator />
-                <div className="flex items-center justify-between">
-                  <span className="text-sm text-muted-foreground">Language</span>
-                  <span className="text-sm font-medium">{snapshot.voice.language ?? "Not set"}</span>
-                </div>
-              </div>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                No voice profile was captured in this config.
-              </p>
-            )}
+            <VoiceStudio currentVoiceId={snapshot.voice?.voice_id ?? null} />
           </CardContent>
         </Card>
 
@@ -363,47 +308,33 @@ export default async function AgentPage() {
               The language model and capabilities compiled into this config.
             </CardDescription>
           </CardHeader>
-          <CardContent className="space-y-5">
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Model</span>
-              <span className="font-mono text-sm font-medium">{snapshot.model ?? "Not set"}</span>
-            </div>
-            <Separator />
-            <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Temperature</span>
-              <span className="font-mono text-sm font-medium tabular-nums">
-                {snapshot.temperature != null ? snapshot.temperature : "Not set"}
-              </span>
-            </div>
-            <Separator />
-            <div>
-              <p className="mb-3 text-sm text-muted-foreground">Enabled Tools</p>
-              {tools.length > 0 ? (
-                <div className="grid gap-2 sm:grid-cols-2">
-                  {tools.map((tool, i) => (
-                    <div
-                      key={`${tool}-${i}`}
-                      className="flex items-center justify-between gap-3 rounded-lg border border-border px-3 py-2.5"
-                    >
-                      <span className="truncate font-mono text-sm font-medium">{tool}</span>
-                      {/* Read-only enabled switch (compiled config is a view) */}
-                      <span
-                        className="inline-flex h-4 w-7 shrink-0 items-center rounded-full bg-success/70 px-0.5"
-                        role="img"
-                        aria-label="Enabled"
-                      >
-                        <span className="ml-auto size-3 rounded-full bg-background" />
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-sm text-muted-foreground">No tools configured.</p>
-              )}
-            </div>
+          <CardContent>
+            <EngineConfig
+              initialTemperature={snapshot.temperature ?? null}
+              initialSpeed={snapshot.voice?.speed ?? null}
+              initialLanguage={snapshot.voice?.language ?? null}
+              initialModel={snapshot.model ?? null}
+            />
           </CardContent>
         </Card>
       </div>
+
+      {/* Tools — enable/disable, inspect, and build custom ones */}
+      <Card id="tools-manager" className="scroll-mt-20">
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Wrench className="size-5" />
+            Tools
+          </CardTitle>
+          <CardDescription>
+            What your agent can actually do on a call. Turn tools on or off, see exactly what each
+            one collects, and add your own.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <ToolManager />
+        </CardContent>
+      </Card>
 
       {/* Policy & Behavior (system prompt) */}
       <Card id="policy" className="scroll-mt-20">

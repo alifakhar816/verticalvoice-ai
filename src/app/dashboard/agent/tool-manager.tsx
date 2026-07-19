@@ -135,7 +135,10 @@ export function ToolManager() {
   }, []);
 
   useEffect(() => {
-    void load();
+    async function initialLoad() {
+      await load();
+    }
+    initialLoad();
   }, [load]);
 
   const packTools = useMemo(() => tools.filter((t) => t.source === "pack"), [tools]);
