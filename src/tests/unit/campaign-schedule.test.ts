@@ -2,11 +2,15 @@ import { describe, expect, it } from "vitest";
 import {
   computeDialBudget,
   computeRetry,
+  DEFAULT_MAX_CALLS_PER_DAY,
+  DEFAULT_MAX_CALLS_PER_WEEK,
+  evaluateFrequencyCap,
   isWithinCallingWindow,
   localMinutesOfDay,
   nextWindowOpening,
   parseWindowTime,
   resolveContactTimezone,
+  resolveFrequencyCaps,
 } from "@/lib/campaigns/schedule";
 
 const BUSINESS_HOURS = { start: "09:00", end: "20:00" };
@@ -285,5 +289,194 @@ describe("computeDialBudget", () => {
         dialedInLastMinute: 9,
       })
     ).toBe(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Per-person frequency caps
+//
+// The failure mode these guard is a real person being rung nine times in a day
+// by three campaigns that each believed they were being polite. Exhaustive
+// here because the arithmetic is rolling-window arithmetic, which is easy to
+// get subtly wrong in the permissive direction.
+// ---------------------------------------------------------------------------
+
+const NOW = new Date("2026-07-19T15:00:00.000Z");
+const HOUR = 60 * 60 * 1000;
+const DAY = 24 * HOUR;
+
+/** `n` hours before NOW, as an ISO string — the shape `calls.started_at` has. */
+function hoursAgo(n: number): string {
+  return new Date(NOW.getTime() - n * HOUR).toISOString();
+}
+
+const CAPS = { maxPerDay: 3, maxPerWeek: 10 };
+
+describe("frequency caps — configuration", () => {
+  it("falls back to the conservative defaults when unconfigured", () => {
+    // An absent setting is NOT consent to call without limit.
+    for (const settings of [null, undefined, {}]) {
+      expect(resolveFrequencyCaps(settings)).toEqual({
+        maxPerDay: DEFAULT_MAX_CALLS_PER_DAY,
+        maxPerWeek: DEFAULT_MAX_CALLS_PER_WEEK,
+      });
+    }
+  });
+
+  it("treats a null column as unconfigured rather than unlimited", () => {
+    expect(
+      resolveFrequencyCaps({ max_calls_per_day: null, max_calls_per_week: null })
+    ).toEqual({ maxPerDay: 3, maxPerWeek: 10 });
+  });
+
+  it("honours a tenant's own numbers, including a stricter zero", () => {
+    expect(
+      resolveFrequencyCaps({ max_calls_per_day: 1, max_calls_per_week: 2 })
+    ).toEqual({ maxPerDay: 1, maxPerWeek: 2 });
+    expect(
+      resolveFrequencyCaps({ max_calls_per_day: 0, max_calls_per_week: 0 })
+    ).toEqual({ maxPerDay: 0, maxPerWeek: 0 });
+  });
+
+  it("clamps a nonsensical negative to zero rather than reading it as unset", () => {
+    // The safe reading of a mistake is the restrictive one.
+    expect(resolveFrequencyCaps({ max_calls_per_day: -5 }).maxPerDay).toBe(0);
+  });
+});
+
+describe("frequency caps — the decision", () => {
+  it("allows a dial below the daily limit", () => {
+    const decision = evaluateFrequencyCap({
+      recentCallStarts: [hoursAgo(1), hoursAgo(5)],
+      caps: CAPS,
+      now: NOW,
+    });
+    expect(decision.allowed).toBe(true);
+    expect(decision.retryAt).toBeNull();
+  });
+
+  it("blocks the dial that would exceed the daily limit", () => {
+    const decision = evaluateFrequencyCap({
+      recentCallStarts: [hoursAgo(1), hoursAgo(5), hoursAgo(9)],
+      caps: CAPS,
+      now: NOW,
+    });
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("daily_cap");
+  });
+
+  it("allows the first dial when there is no history at all", () => {
+    expect(
+      evaluateFrequencyCap({ recentCallStarts: [], caps: CAPS, now: NOW }).allowed
+    ).toBe(true);
+  });
+
+  it("rolls the window off — the oldest call ageing out reopens the door", () => {
+    // Three calls at the cap: blocked, and retryable exactly when the OLDEST
+    // one leaves the rolling 24h window, not a moment later.
+    const oldest = hoursAgo(9);
+    const decision = evaluateFrequencyCap({
+      recentCallStarts: [hoursAgo(1), hoursAgo(5), oldest],
+      caps: CAPS,
+      now: NOW,
+    });
+    expect(decision.allowed).toBe(false);
+    expect(decision.retryAt?.getTime()).toBe(new Date(oldest).getTime() + DAY);
+
+    // And at that instant it is genuinely allowed again.
+    const later = new Date(decision.retryAt!.getTime() + 1000);
+    expect(
+      evaluateFrequencyCap({
+        recentCallStarts: [hoursAgo(1), hoursAgo(5), oldest],
+        caps: CAPS,
+        now: later,
+      }).allowed
+    ).toBe(true);
+  });
+
+  it("ignores calls that already fell out of the window", () => {
+    // Three calls, but all older than 24h: the daily window is empty.
+    expect(
+      evaluateFrequencyCap({
+        recentCallStarts: [hoursAgo(30), hoursAgo(40), hoursAgo(50)],
+        caps: CAPS,
+        now: NOW,
+      }).allowed
+    ).toBe(true);
+  });
+
+  it("waits only as long as it must when well over the cap", () => {
+    // Five calls against a cap of three: we need the THIRD-oldest to age out,
+    // not the newest. Waiting for the newest would delay by a full extra day.
+    const starts = [hoursAgo(2), hoursAgo(4), hoursAgo(6), hoursAgo(8), hoursAgo(10)];
+    const decision = evaluateFrequencyCap({ recentCallStarts: starts, caps: CAPS, now: NOW });
+    expect(decision.retryAt?.getTime()).toBe(new Date(hoursAgo(6)).getTime() + DAY);
+  });
+
+  it("enforces the weekly ceiling even when the day is clear", () => {
+    // Ten calls spread across the week, none in the last 24h. The daily window
+    // is empty, but the person has still been rung ten times this week.
+    const starts = Array.from({ length: 10 }, (_, i) => hoursAgo(30 + i * 10));
+    const decision = evaluateFrequencyCap({ recentCallStarts: starts, caps: CAPS, now: NOW });
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("weekly_cap");
+  });
+
+  it("takes the LATER reopening when both ceilings bind", () => {
+    // Under both windows at once, the weekly one opens much later and it is
+    // the weekly one that must be obeyed.
+    const starts = [
+      ...Array.from({ length: 8 }, (_, i) => hoursAgo(30 + i * 10)),
+      hoursAgo(1),
+      hoursAgo(2),
+      hoursAgo(3),
+    ];
+    const decision = evaluateFrequencyCap({ recentCallStarts: starts, caps: CAPS, now: NOW });
+    expect(decision.allowed).toBe(false);
+    expect(decision.reason).toBe("weekly_cap");
+    // Later than any purely-daily roll-off could be.
+    expect(decision.retryAt!.getTime()).toBeGreaterThan(NOW.getTime() + DAY);
+  });
+
+  it("never reopens when the cap is zero", () => {
+    // A retry time here would silently become a dial. Park indefinitely.
+    const decision = evaluateFrequencyCap({
+      recentCallStarts: [hoursAgo(100)],
+      caps: { maxPerDay: 0, maxPerWeek: 10 },
+      now: NOW,
+    });
+    expect(decision.allowed).toBe(false);
+    expect(decision.retryAt).toBeNull();
+  });
+
+  it("blocks on a zero cap even with no call history whatsoever", () => {
+    // Zero means zero: not "zero more than you've already had".
+    expect(
+      evaluateFrequencyCap({
+        recentCallStarts: [],
+        caps: { maxPerDay: 0, maxPerWeek: 0 },
+        now: NOW,
+      }).allowed
+    ).toBe(false);
+  });
+
+  it("ignores unparseable timestamps rather than throwing", () => {
+    // A scheduling helper that throws takes the whole dialer tick down.
+    const decision = evaluateFrequencyCap({
+      recentCallStarts: ["not-a-date", "", hoursAgo(1)],
+      caps: CAPS,
+      now: NOW,
+    });
+    expect(decision.allowed).toBe(true);
+  });
+
+  it("accepts Date objects as readily as ISO strings", () => {
+    expect(
+      evaluateFrequencyCap({
+        recentCallStarts: [new Date(NOW.getTime() - HOUR)],
+        caps: { maxPerDay: 1, maxPerWeek: 10 },
+        now: NOW,
+      }).allowed
+    ).toBe(false);
   });
 });

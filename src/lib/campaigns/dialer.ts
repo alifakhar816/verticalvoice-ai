@@ -8,9 +8,13 @@ import {
 import {
   computeDialBudget,
   computeRetry,
+  evaluateFrequencyCap,
+  FREQUENCY_LOOKBACK_MS,
   isWithinCallingWindow,
   nextWindowOpening,
   resolveContactTimezone,
+  resolveFrequencyCaps,
+  type FrequencyCaps,
 } from "./schedule";
 
 /**
@@ -144,6 +148,44 @@ async function isOptedOut(
     .maybeSingle();
 
   return Boolean(byPhone);
+}
+
+/**
+ * Prior outbound dials to `phone` for this tenant, within the cap lookback.
+ *
+ * Counted against `calls` — rows that exist only because a dial actually
+ * happened — rather than against campaign_targets, which records intentions
+ * and would let a person be "called" by a queue that never rang anything.
+ *
+ * `called_number` is the counterparty for direction='outbound' (caller_number
+ * is the tenant's own line); reading the wrong column would count every
+ * campaign call the tenant ever placed as if it went to this one person.
+ *
+ * Test calls are deliberately included: `is_test` marks the operator's intent,
+ * not the phone's experience, and a test call rings a real handset.
+ */
+async function loadRecentDialStarts(
+  admin: SupabaseClient<Database>,
+  tenantId: string,
+  phone: string,
+  now: Date
+): Promise<string[]> {
+  const since = new Date(now.getTime() - FREQUENCY_LOOKBACK_MS).toISOString();
+
+  const { data } = await admin
+    .from("calls")
+    .select("started_at")
+    .eq("tenant_id", tenantId)
+    .eq("direction", "outbound")
+    .eq("called_number", phone)
+    .gte("started_at", since)
+    // The cap is a small number; a pathological row count must not be read
+    // into memory wholesale. Any limit far above the cap gives the same verdict.
+    .limit(500);
+
+  return ((data ?? []) as { started_at: string | null }[])
+    .map((row) => row.started_at)
+    .filter((value): value is string => Boolean(value));
 }
 
 /** Returns a claimed target to the queue without charging an attempt. */
@@ -283,6 +325,16 @@ async function runCampaign(
     .maybeSingle();
   const tenantTimezone = profile?.timezone ?? null;
 
+  // Per-person frequency ceilings are a TENANT policy, not a campaign one:
+  // their whole purpose is to bound what one human experiences across every
+  // campaign at once, so a per-campaign setting could not express them.
+  const { data: policy } = await admin
+    .from("policy_settings")
+    .select("max_calls_per_day, max_calls_per_week")
+    .eq("tenant_id", campaign.tenant_id)
+    .maybeSingle();
+  const frequencyCaps: FrequencyCaps = resolveFrequencyCaps(policy);
+
   const window = {
     start: campaign.calling_window_start,
     end: campaign.calling_window_end,
@@ -353,6 +405,32 @@ async function runCampaign(
       // every minute all night.
       const opening = nextWindowOpening(now, timezone, window);
       await requeue(admin, target.id, opening);
+      result.deferred += 1;
+      continue;
+    }
+
+    // How often this PERSON has been rung lately, across every campaign this
+    // tenant runs. Evaluated here at dial time rather than when the list was
+    // built, because the list does not know what the other campaigns did after
+    // it was built — and because a re-run of this same campaign would
+    // otherwise start from a clean slate against a phone that is not clean.
+    const frequency = evaluateFrequencyCap({
+      recentCallStarts: await loadRecentDialStarts(
+        admin,
+        campaign.tenant_id,
+        target.phone,
+        now
+      ),
+      caps: frequencyCaps,
+      now,
+    });
+
+    if (!frequency.allowed) {
+      // DEFERRED, not failed. This person has not declined anything; we have
+      // simply spent our budget of their attention for now. Parked until the
+      // window rolls off, and no attempt charged — being called too often is
+      // our doing, and it must not consume the attempts they are owed.
+      await requeue(admin, target.id, frequency.retryAt);
       result.deferred += 1;
       continue;
     }

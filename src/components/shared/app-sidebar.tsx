@@ -8,6 +8,7 @@ import {
   PhoneOutgoing,
   BookUser,
   History,
+  Megaphone,
   Bot,
   Brain,
   Building2,
@@ -65,6 +66,11 @@ const mainNavItems = [
     title: "Outbound Calls",
     url: "/dashboard/outbound",
     icon: PhoneOutgoing,
+  },
+  {
+    title: "Campaigns",
+    url: "/dashboard/campaigns",
+    icon: Megaphone,
   },
   {
     title: "Contacts",

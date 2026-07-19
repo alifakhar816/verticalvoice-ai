@@ -162,6 +162,8 @@ export interface Database {
           allow_outbound: boolean;
           require_caller_id: boolean;
           pii_redaction_enabled: boolean;
+          max_calls_per_day: number | null;
+          max_calls_per_week: number | null;
           created_at: string;
           updated_at: string;
         };
@@ -175,6 +177,8 @@ export interface Database {
           allow_outbound?: boolean;
           require_caller_id?: boolean;
           pii_redaction_enabled?: boolean;
+          max_calls_per_day?: number | null;
+          max_calls_per_week?: number | null;
           created_at?: string;
           updated_at?: string;
         };
@@ -188,6 +192,8 @@ export interface Database {
           allow_outbound?: boolean;
           require_caller_id?: boolean;
           pii_redaction_enabled?: boolean;
+          max_calls_per_day?: number | null;
+          max_calls_per_week?: number | null;
           created_at?: string;
           updated_at?: string;
         };

@@ -388,6 +388,158 @@ export function computeRetry(params: {
 }
 
 // ---------------------------------------------------------------------------
+// Per-person frequency caps
+//
+// `max_attempts` bounds how often ONE campaign retries ONE target. It says
+// nothing about how often a PERSON is called, and those are different numbers
+// the moment a tenant runs two campaigns over overlapping lists, re-runs a
+// campaign, or imports the same contact twice. Three campaigns each politely
+// limited to three attempts is nine calls to the same human in a day.
+//
+// So the ceiling below is counted per phone number, across every campaign the
+// tenant runs, against the `calls` table — real dials, not queued intentions.
+// Rolling windows rather than calendar days: a calendar-day cap resets at
+// local midnight and lets someone be called three times at 23:00 and three
+// more at 00:05, which is precisely the experience the cap exists to prevent.
+// ---------------------------------------------------------------------------
+
+/**
+ * Conservative defaults, mined from the pre-dialer compliance worker
+ * (`src/workers/outbound/index.ts`, now dead) which hardcoded 3/day and
+ * 10/week. The numbers were sound; hardcoding them was not, so they are
+ * defaults here and overridable per tenant in `policy_settings`.
+ */
+export const DEFAULT_MAX_CALLS_PER_DAY = 3;
+export const DEFAULT_MAX_CALLS_PER_WEEK = 10;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+const WEEK_MS = 7 * DAY_MS;
+
+/** How far back the dialer must read to evaluate both windows. */
+export const FREQUENCY_LOOKBACK_MS = WEEK_MS;
+
+export interface FrequencyCaps {
+  /** Max dials to one number in any rolling 24 hours. */
+  maxPerDay: number;
+  /** Max dials to one number in any rolling 7 days. */
+  maxPerWeek: number;
+}
+
+/**
+ * Reads a tenant's configured caps, falling back to the defaults.
+ *
+ * A null column means "not configured", which is the overwhelmingly common
+ * case and must mean the conservative default rather than "no limit" — an
+ * absent setting is not consent. Negative values clamp to 0 (never call)
+ * rather than being treated as unset, because a negative ceiling can only be
+ * a mistake and the safe reading of a mistake is the restrictive one.
+ */
+export function resolveFrequencyCaps(
+  settings:
+    | { max_calls_per_day?: number | null; max_calls_per_week?: number | null }
+    | null
+    | undefined
+): FrequencyCaps {
+  const pick = (value: number | null | undefined, fallback: number): number => {
+    if (value === null || value === undefined) return fallback;
+    if (!Number.isFinite(value)) return fallback;
+    return Math.max(0, Math.floor(value));
+  };
+
+  return {
+    maxPerDay: pick(settings?.max_calls_per_day, DEFAULT_MAX_CALLS_PER_DAY),
+    maxPerWeek: pick(settings?.max_calls_per_week, DEFAULT_MAX_CALLS_PER_WEEK),
+  };
+}
+
+export interface FrequencyCapDecision {
+  allowed: boolean;
+  /** Which ceiling is binding; null when allowed. */
+  reason: "daily_cap" | "weekly_cap" | null;
+  /**
+   * The instant the window has rolled off far enough to permit a call.
+   * Null when allowed, and null when the cap is 0 — a cap of 0 never opens,
+   * so the target parks indefinitely rather than being handed a retry time
+   * that would silently become a dial.
+   */
+  retryAt: Date | null;
+}
+
+/**
+ * Earliest instant at which `hits` drops below `cap`, given a window length.
+ *
+ * We do not need every call to age out — only enough of them. With five calls
+ * against a cap of three, the third-oldest leaving the window is what takes
+ * the count to two, so that is the moment to retry. Waiting for the newest to
+ * age out instead would delay the call by up to a full window for no reason.
+ */
+function rollOffAt(
+  sortedAscending: readonly number[],
+  cap: number,
+  windowMs: number
+): Date | null {
+  if (cap <= 0) return null; // never opens
+  const index = sortedAscending.length - cap;
+  if (index < 0) return null;
+  return new Date(sortedAscending[index] + windowMs);
+}
+
+/**
+ * May we dial this person again right now?
+ *
+ * Pure, so the rolling-window arithmetic can be tested exhaustively without a
+ * database — the same reasoning as the calling-window helpers above. The
+ * caller supplies the dial timestamps; this decides.
+ *
+ * Both ceilings apply at once and the LATER reopening wins: a target under the
+ * daily cap but over the weekly one is still not callable, and must wait for
+ * the weekly window, not the daily one.
+ */
+export function evaluateFrequencyCap(params: {
+  /** `calls.started_at` for prior outbound dials to this number. */
+  recentCallStarts: readonly (string | Date)[];
+  caps: FrequencyCaps;
+  now: Date;
+}): FrequencyCapDecision {
+  const nowMs = params.now.getTime();
+
+  const stamps = params.recentCallStarts
+    .map((value) => (value instanceof Date ? value.getTime() : Date.parse(String(value))))
+    .filter((ms) => Number.isFinite(ms))
+    .sort((a, b) => a - b);
+
+  const inDay = stamps.filter((ms) => ms >= nowMs - DAY_MS);
+  const inWeek = stamps.filter((ms) => ms >= nowMs - WEEK_MS);
+
+  const dailyBlocked = inDay.length >= params.caps.maxPerDay;
+  const weeklyBlocked = inWeek.length >= params.caps.maxPerWeek;
+
+  if (!dailyBlocked && !weeklyBlocked) {
+    return { allowed: true, reason: null, retryAt: null };
+  }
+
+  const dailyRetry = dailyBlocked ? rollOffAt(inDay, params.caps.maxPerDay, DAY_MS) : null;
+  const weeklyRetry = weeklyBlocked ? rollOffAt(inWeek, params.caps.maxPerWeek, WEEK_MS) : null;
+
+  // A cap that never opens (0, or a count that cannot age below the ceiling)
+  // dominates: if either constraint can never be satisfied, neither can the
+  // pair of them.
+  if ((dailyBlocked && !dailyRetry) || (weeklyBlocked && !weeklyRetry)) {
+    return {
+      allowed: false,
+      reason: dailyBlocked && !dailyRetry ? "daily_cap" : "weekly_cap",
+      retryAt: null,
+    };
+  }
+
+  const daily = dailyRetry?.getTime() ?? -Infinity;
+  const weekly = weeklyRetry?.getTime() ?? -Infinity;
+  return weekly > daily
+    ? { allowed: false, reason: "weekly_cap", retryAt: weeklyRetry }
+    : { allowed: false, reason: "daily_cap", retryAt: dailyRetry };
+}
+
+// ---------------------------------------------------------------------------
 // Pacing
 // ---------------------------------------------------------------------------
 

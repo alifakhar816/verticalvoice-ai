@@ -28,6 +28,7 @@ interface Store {
   contacts: Row[];
   calls: Row[];
   business_profiles: Row[];
+  policy_settings: Row[];
   audit_events: Row[];
 }
 
@@ -198,6 +199,12 @@ function makeStore(overrides: Partial<Store> = {}): Store {
     contacts: [],
     calls: [],
     business_profiles: [{ tenant_id: TENANT_ID, timezone: "America/New_York" }],
+    // Nulls mean "unconfigured", which resolves to the conservative defaults
+    // (3/day, 10/week) — the same thing a real tenant who never touched the
+    // setting gets.
+    policy_settings: [
+      { tenant_id: TENANT_ID, max_calls_per_day: null, max_calls_per_week: null },
+    ],
     audit_events: [],
     ...overrides,
   };
@@ -566,6 +573,212 @@ describe("campaign dialer — completion", () => {
     store.campaigns[0].calls_per_minute = 1;
 
     await runCampaignDialerTick(makeAdmin(store));
+
+    expect(store.campaigns[0].status).toBe("running");
+  });
+});
+
+describe("campaign dialer — per-person frequency caps", () => {
+  const NOW = new Date("2026-07-19T15:00:00.000Z");
+  const HOUR = 60 * 60 * 1000;
+
+  /** A completed outbound dial to `to`, `n` hours before NOW. */
+  function priorDial(n: number, overrides: Row = {}): Row {
+    return {
+      id: `call-${n}-${Math.random()}`,
+      tenant_id: TENANT_ID,
+      direction: "outbound",
+      status: "completed",
+      caller_number: "+13615550199", // the tenant's own line
+      called_number: "+12125550100", // the person
+      started_at: new Date(NOW.getTime() - n * HOUR).toISOString(),
+      ...overrides,
+    };
+  }
+
+  it("dials when the person is under the daily limit", async () => {
+    // Two prior calls against a default cap of three: still callable.
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(2), priorDial(6)],
+    });
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(placeOutboundCallForTenant).toHaveBeenCalledTimes(1);
+    expect(result.dialed).toBe(1);
+  });
+
+  it("defers — does not fail — the person at the limit", async () => {
+    // This person is not uninterested. We have simply rung them enough today.
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(2), priorDial(6), priorDial(10)],
+    });
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(placeOutboundCallForTenant).not.toHaveBeenCalled();
+    expect(result.deferred).toBe(1);
+    expect(result.failed).toBe(0);
+    expect(result.dialed).toBe(0);
+
+    const row = store.campaign_targets[0];
+    // Retryable later, not terminal.
+    expect(row.state).toBe("queued");
+    expect(row.failure_reason).toBeNull();
+    // And crucially: no attempt burned. Being called too often is OUR doing,
+    // and it must not consume the attempts this person is owed.
+    expect(row.attempts).toBe(0);
+    // Parked on the roll-off rather than re-examined every minute.
+    expect(new Date(String(row.next_attempt_at)).getTime()).toBe(
+      NOW.getTime() - 10 * HOUR + 24 * HOUR,
+    );
+  });
+
+  it("counts across ALL campaigns, not just this one", async () => {
+    // The whole point of the cap: three campaigns each politely limited to
+    // three attempts is nine calls to one human. These prior dials carry no
+    // campaign id at all — they are simply calls this tenant placed.
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(1), priorDial(2), priorDial(3)],
+    });
+
+    await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(placeOutboundCallForTenant).not.toHaveBeenCalled();
+  });
+
+  it("rolls the window off — yesterday's calls stop counting", async () => {
+    // Three calls, all older than 24h. The rolling window is empty again, so
+    // this person is callable. A calendar-day cap would also allow this; the
+    // test below is the one that separates them.
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(26), priorDial(30), priorDial(36)],
+    });
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(result.dialed).toBe(1);
+  });
+
+  it("does not reset at midnight the way a calendar-day cap would", async () => {
+    // Three calls in the last four hours that happen to straddle local
+    // midnight. A calendar-day cap resets and dials; a rolling one does not.
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(1), priorDial(2), priorDial(4)],
+    });
+
+    await runCampaignDialerTick(makeAdmin(store), {
+      now: new Date("2026-07-20T04:30:00.000Z"), // 00:30 in New York
+    });
+
+    expect(placeOutboundCallForTenant).not.toHaveBeenCalled();
+  });
+
+  it("is tenant-scoped — another tenant's calls to the same number don't count", async () => {
+    // Numbers are not globally unique to a tenant, and one tenant's dialling
+    // history must never suppress another's.
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [
+        priorDial(1, { tenant_id: "99999999-9999-9999-9999-999999999999" }),
+        priorDial(2, { tenant_id: "99999999-9999-9999-9999-999999999999" }),
+        priorDial(3, { tenant_id: "99999999-9999-9999-9999-999999999999" }),
+      ],
+    });
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(result.dialed).toBe(1);
+  });
+
+  it("counts called_number, not caller_number, for outbound", async () => {
+    // For direction='outbound' the counterparty is `called_number`;
+    // `caller_number` is the tenant's own line. Reading the wrong column would
+    // count every campaign call the tenant ever placed against one person.
+    const store = makeStore({
+      campaign_targets: [target({ phone: "+12125550100" })],
+      calls: [
+        priorDial(1, { called_number: "+15555550001", caller_number: "+12125550100" }),
+        priorDial(2, { called_number: "+15555550002", caller_number: "+12125550100" }),
+        priorDial(3, { called_number: "+15555550003", caller_number: "+12125550100" }),
+      ],
+    });
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    // Those three went to three OTHER people. This person is callable.
+    expect(result.dialed).toBe(1);
+  });
+
+  it("ignores inbound calls — the person ringing US is not us ringing them", async () => {
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [
+        priorDial(1, { direction: "inbound" }),
+        priorDial(2, { direction: "inbound" }),
+        priorDial(3, { direction: "inbound" }),
+      ],
+    });
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(result.dialed).toBe(1);
+  });
+
+  it("honours a tenant's stricter configured cap", async () => {
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(3)],
+    });
+    store.policy_settings[0].max_calls_per_day = 1;
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(placeOutboundCallForTenant).not.toHaveBeenCalled();
+    expect(result.deferred).toBe(1);
+    expect(store.campaign_targets[0].attempts).toBe(0);
+  });
+
+  it("honours a tenant's more permissive configured cap", async () => {
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(2), priorDial(6), priorDial(10)],
+    });
+    store.policy_settings[0].max_calls_per_day = 5;
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(result.dialed).toBe(1);
+  });
+
+  it("applies the default cap when the tenant has no policy row at all", async () => {
+    // A missing row must not read as "no limit".
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(2), priorDial(6), priorDial(10)],
+      policy_settings: [],
+    });
+
+    const result = await runCampaignDialerTick(makeAdmin(store), { now: NOW });
+
+    expect(placeOutboundCallForTenant).not.toHaveBeenCalled();
+    expect(result.deferred).toBe(1);
+  });
+
+  it("leaves the campaign running rather than completing it on a deferral", async () => {
+    // A deferred person is unfinished work. Completing the campaign here would
+    // strand them permanently.
+    const store = makeStore({
+      campaign_targets: [target()],
+      calls: [priorDial(2), priorDial(6), priorDial(10)],
+    });
+
+    await runCampaignDialerTick(makeAdmin(store), { now: NOW });
 
     expect(store.campaigns[0].status).toBe("running");
   });

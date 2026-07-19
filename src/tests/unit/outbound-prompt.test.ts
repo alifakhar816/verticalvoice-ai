@@ -52,6 +52,37 @@ describe("outbound system prompt", () => {
     expect(prompt).toContain("outbound reminder call");
   });
 
+  it("discloses that the caller is an AI", () => {
+    // The person did not choose to speak to a machine. Several jurisdictions
+    // require this on AI-driven outbound calls; it is the honest default
+    // regardless. Absent from the live agent until now — only the dead
+    // pre-dialer worker ever disclosed.
+    const prompt = build();
+    expect(prompt).toContain("You are an AI assistant, and you must say so");
+    expect(prompt).toContain("I'm the AI assistant at Harbor House Kitchen");
+  });
+
+  it("keeps the disclosure to one early clause, not a speech", () => {
+    // A disclosure sentence of its own would double the opening turn and break
+    // the turn-brevity rule the compiled voice rules impose. It rides along in
+    // the greeting the agent was already going to say, once.
+    const prompt = build();
+    expect(prompt).toContain("a short natural clause");
+    expect(prompt).toContain("Say it plainly, once, in your own words");
+    expect(prompt).toContain("do not mention it again later");
+    // And it must not drag the agent into explaining or apologising for itself.
+    expect(prompt).toContain("Do not explain what an AI is, do not apologise");
+  });
+
+  it("answers a direct 'are you a real person' without hedging", () => {
+    expect(build()).toContain("say you are an AI, briefly and without hedging");
+  });
+
+  it("discloses even when the tenant has no compiled config", () => {
+    // The fallback path is still a real outbound call to a real person.
+    expect(build({ compiledPrompt: null })).toContain("You are an AI assistant");
+  });
+
   it("carries the filled call script through", () => {
     expect(build()).toContain("Confirm their reservation for Friday at 7pm.");
   });

@@ -31,6 +31,16 @@ export function buildOutboundSystemPrompt(params: {
 
   const framing = [
     `THIS CALL: You are placing an outbound ${category} call on behalf of ${businessName}. The person did not call you — you called them, so state who you are and why you are calling in your first sentence, then stop and let them respond.`,
+    // Disclosure. Several jurisdictions require it on AI-driven outbound calls,
+    // and it is the honest thing to do regardless: this person did not choose
+    // to speak to a machine, so they are told before they invest in the
+    // conversation. Deliberately specified as a CLAUSE inside the greeting the
+    // agent was already going to say, not as a sentence of its own — a
+    // separate disclosure sentence turns a ten-word opening into a
+    // twenty-five-word one and breaks the turn-brevity rule the compiled voice
+    // rules impose. Bounded to once, because an agent that keeps announcing
+    // its own nature sounds evasive rather than transparent.
+    `You are an AI assistant, and you must say so in that opening sentence — a short natural clause is exactly right, as in "Hi, I'm the AI assistant at ${businessName}". Say it plainly, once, in your own words. Do not explain what an AI is, do not apologise for it, and do not mention it again later. If they ask whether you are a real person, say you are an AI, briefly and without hedging.`,
     script,
     `If they ask not to be called again, acknowledge it plainly, tell them you'll remove them, and end the call. Do not argue or re-pitch.`,
   ]
