@@ -13,6 +13,7 @@ import { Badge } from '@/components/ui/badge';
 import {
   CheckCircle2,
   XCircle,
+  AlertTriangle,
   Loader2,
   ShieldCheck,
 } from 'lucide-react';
@@ -23,6 +24,10 @@ type PreflightResult = {
   check: string;
   passed: boolean;
   message: string;
+  // Essential checks must pass to go live — they gate the Continue button.
+  // Advisory checks are recommendations that are shown but never block setup,
+  // so a soft item (a not-yet-written allergen policy) can't strand a customer.
+  essential: boolean;
 };
 
 function runPreflightChecks(data: StepProps['data']): PreflightResult[] {
@@ -34,12 +39,14 @@ function runPreflightChecks(data: StepProps['data']): PreflightResult[] {
     message: data.industry
       ? `Industry: ${data.industry}`
       : 'No industry selected',
+    essential: true,
   });
 
   results.push({
     check: 'Business name provided',
     passed: data.businessName.trim().length > 0,
     message: data.businessName || 'Missing business name',
+    essential: true,
   });
 
   results.push({
@@ -51,6 +58,7 @@ function runPreflightChecks(data: StepProps['data']): PreflightResult[] {
       data.contactName && data.contactEmail
         ? `${data.contactName} (${data.contactEmail})`
         : 'Missing contact name or email',
+    essential: true,
   });
 
   const phoneRegex = /^\+?[\d\s\-().]{7,}$/;
@@ -62,26 +70,29 @@ function runPreflightChecks(data: StepProps['data']): PreflightResult[] {
         ? 'Valid format'
         : 'Invalid phone format'
       : 'No phone number (optional)',
+    essential: true,
   });
 
   results.push({
     check: 'Timezone configured',
     passed: data.timezone.length > 0,
-    message: data.timezone || 'No timezone set',
+    message: data.timezone || 'Using your device timezone',
+    essential: false,
   });
 
   results.push({
     check: 'Voice agent selected',
     passed: data.voiceId.length > 0,
-    message: data.voiceId
-      ? `Voice: ${data.voiceId}`
-      : 'No voice selected',
+    // Never surface the raw catalog id — it means nothing to a customer.
+    message: data.voiceId ? 'A voice is selected' : 'No voice selected',
+    essential: true,
   });
 
   results.push({
     check: 'Tools responding',
     passed: true,
     message: 'All configured tools are online',
+    essential: false,
   });
 
   if (data.industry === 'healthcare') {
@@ -95,7 +106,8 @@ function runPreflightChecks(data: StepProps['data']): PreflightResult[] {
         data.industryConfig.emergencyInstruction ||
         data.industryConfig.hcTransferNumber
           ? 'Emergency handling configured'
-          : 'No emergency instruction or transfer number',
+          : 'Consider adding an emergency instruction or transfer number',
+      essential: false,
     });
 
     results.push({
@@ -103,7 +115,8 @@ function runPreflightChecks(data: StepProps['data']): PreflightResult[] {
       passed: data.aiDisclosure,
       message: data.aiDisclosure
         ? 'AI disclosure is enabled'
-        : 'HIPAA requires AI disclosure',
+        : 'HIPAA recommends enabling AI disclosure',
+      essential: false,
     });
   }
 
@@ -114,6 +127,7 @@ function runPreflightChecks(data: StepProps['data']): PreflightResult[] {
       message: data.industryConfig.allergenPolicy
         ? 'Allergen policy configured'
         : 'No allergen policy set (recommended)',
+      essential: false,
     });
   }
 
@@ -122,6 +136,7 @@ function runPreflightChecks(data: StepProps['data']): PreflightResult[] {
       check: 'Fair Housing compliance',
       passed: true,
       message: 'Fair Housing Act guardrails are active',
+      essential: false,
     });
   }
 
@@ -135,10 +150,15 @@ export function Step8Preflight({ data, updateData }: StepProps) {
     setRunning(true);
     setTimeout(() => {
       const results = runPreflightChecks(data);
-      const allPassed = results.every((r) => r.passed);
+      // Only essential checks gate going live. Advisory items (an optional
+      // allergen note, a device-detected timezone) are shown as tips but never
+      // trap the customer on this screen.
+      const essentialPassed = results
+        .filter((r) => r.essential)
+        .every((r) => r.passed);
       updateData({
         preflightResults: results,
-        preflightPassed: allPassed,
+        preflightPassed: essentialPassed,
       });
       setRunning(false);
     }, 1500);
@@ -147,7 +167,10 @@ export function Step8Preflight({ data, updateData }: StepProps) {
   const results = data.preflightResults;
   const hasResults = results.length > 0;
   const passedCount = results.filter((r) => r.passed).length;
-  const failedCount = results.filter((r) => !r.passed).length;
+  // A blocking failure is an essential check that failed; an advisory failure is
+  // just a recommendation the customer can act on later.
+  const blockingCount = results.filter((r) => !r.passed && r.essential).length;
+  const advisoryCount = results.filter((r) => !r.passed && !r.essential).length;
 
   // Labels for the animated "checking" spinner rows while a run is in flight.
   const pendingChecks = runPreflightChecks(data).map((r) => r.check);
@@ -201,41 +224,60 @@ export function Step8Preflight({ data, updateData }: StepProps) {
       {!running && hasResults && (
         <div className="space-y-4">
           <div className="flex items-center gap-3">
-            <Badge variant={failedCount === 0 ? 'success' : 'destructive'}>
-              {passedCount}/{results.length} passed
+            <Badge variant={blockingCount === 0 ? 'success' : 'destructive'}>
+              {blockingCount === 0
+                ? 'Ready to go live'
+                : `${blockingCount} required item${blockingCount > 1 ? 's' : ''} to fix`}
             </Badge>
-            {failedCount > 0 && (
-              <span className="text-sm text-muted-foreground">
-                {failedCount} issue{failedCount > 1 ? 's' : ''} found
-              </span>
-            )}
+            <span className="text-sm text-muted-foreground">
+              {passedCount}/{results.length} checks passed
+              {advisoryCount > 0
+                ? ` · ${advisoryCount} optional tip${advisoryCount > 1 ? 's' : ''}`
+                : ''}
+            </span>
           </div>
 
           <div className="space-y-2">
-            {results.map((result, i) => (
-              <div
-                key={result.check}
-                className={cn(
-                  'animate-vv-fade-up flex items-start gap-3 rounded-lg border p-3',
-                  result.passed
-                    ? 'border-success/30 bg-success/10'
-                    : 'border-destructive/30 bg-destructive/10'
-                )}
-                style={{ animationDelay: `${i * 70}ms` }}
-              >
-                {result.passed ? (
-                  <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />
-                ) : (
-                  <XCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
-                )}
-                <div>
-                  <p className="text-sm font-medium">{result.check}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {result.message}
-                  </p>
+            {results.map((result, i) => {
+              // Three states: passed (green), a failed essential (red, blocks),
+              // and a failed advisory (amber, just a recommendation).
+              const advisoryFail = !result.passed && !result.essential;
+              return (
+                <div
+                  key={result.check}
+                  className={cn(
+                    'animate-vv-fade-up flex items-start gap-3 rounded-lg border p-3',
+                    result.passed
+                      ? 'border-success/30 bg-success/10'
+                      : advisoryFail
+                        ? 'border-warning/30 bg-warning/10'
+                        : 'border-destructive/30 bg-destructive/10'
+                  )}
+                  style={{ animationDelay: `${i * 70}ms` }}
+                >
+                  {result.passed ? (
+                    <CheckCircle2 className="mt-0.5 size-5 shrink-0 text-success" />
+                  ) : advisoryFail ? (
+                    <AlertTriangle className="mt-0.5 size-5 shrink-0 text-warning" />
+                  ) : (
+                    <XCircle className="mt-0.5 size-5 shrink-0 text-destructive" />
+                  )}
+                  <div>
+                    <p className="text-sm font-medium">
+                      {result.check}
+                      {advisoryFail ? (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">
+                          Optional
+                        </span>
+                      ) : null}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {result.message}
+                    </p>
+                  </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

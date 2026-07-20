@@ -58,9 +58,21 @@ function loadPersistedState(): { data: OnboardingData; currentStep: number } | n
 export default function OnboardingPage() {
   const persisted = loadPersistedState();
   const [currentStep, setCurrentStep] = useState(persisted?.currentStep ?? 0);
-  const [data, setData] = useState<OnboardingData>(
-    persisted?.data ?? initialOnboardingData
-  );
+  const [data, setData] = useState<OnboardingData>(() => {
+    const base = persisted?.data ?? initialOnboardingData;
+    // Detect the visitor's timezone up front so bookings and call times are
+    // right without making them hunt for it in a dropdown. They can still
+    // change it on the Business step; this just fills a sensible default.
+    if (!base.timezone) {
+      try {
+        const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        if (detected) return { ...base, timezone: detected };
+      } catch {
+        // Intl unavailable — leave it; the timezone check is advisory anyway.
+      }
+    }
+    return base;
+  });
   // Slide direction: 1 = forward, -1 = back. Drives the transition only.
   const [direction, setDirection] = useState<1 | -1>(1);
 

@@ -64,6 +64,7 @@ export interface OnboardingData {
     check: string;
     passed: boolean;
     message: string;
+    essential: boolean;
   }>;
 
   // Step 9 - Test call
