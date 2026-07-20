@@ -30,7 +30,7 @@ export default function SignupPage() {
     e.preventDefault();
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -47,6 +47,26 @@ export default function SignupPage() {
       return;
     }
 
+    // When email confirmation is disabled (auto-confirm), signUp returns a live
+    // session — the user is already signed in. Sending them to a "check your
+    // email" screen for a mail that will never arrive was a dead end; take them
+    // straight into onboarding instead. A full navigation (not router.push) so
+    // the server sees the freshly-set auth cookie and lets them through.
+    if (data.session) {
+      window.location.assign('/onboarding');
+      return;
+    }
+
+    // No session AND no identities means the email already belongs to a
+    // confirmed account — Supabase obfuscates this to prevent enumeration, so
+    // point them at sign-in rather than promising another verification mail.
+    if (data.user && data.user.identities && data.user.identities.length === 0) {
+      toast.info('You already have an account with this email. Please sign in.');
+      setLoading(false);
+      return;
+    }
+
+    // A real pending-confirmation signup (email confirmation is switched on).
     setSubmitted(true);
     setLoading(false);
   }

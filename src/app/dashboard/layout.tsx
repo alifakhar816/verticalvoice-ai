@@ -1,5 +1,6 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/database/supabase-server";
+import { getCurrentTenantId } from "@/domain/tenants/current";
 import { SidebarProvider, SidebarInset, SidebarTrigger } from "@/components/ui/sidebar";
 import { Separator } from "@/components/ui/separator";
 import { AppSidebar } from "@/components/shared/app-sidebar";
@@ -16,6 +17,15 @@ export default async function DashboardLayout({
 
   if (!user) {
     redirect("/login");
+  }
+
+  // A signed-in user with no tenant hasn't finished setup. Every dashboard page
+  // needs a tenant to show anything, so send them to onboarding rather than a
+  // shell full of empty states. Onboarding lives at /onboarding, outside this
+  // layout, so there is no redirect loop.
+  const tenantId = await getCurrentTenantId(user.id);
+  if (!tenantId) {
+    redirect("/onboarding");
   }
 
   const userInfo = {
