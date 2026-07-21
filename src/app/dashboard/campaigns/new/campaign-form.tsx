@@ -4,7 +4,11 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { toast } from "sonner";
-import { AlertTriangle, Loader2, Megaphone, Users } from "lucide-react";
+import { AlertTriangle, Loader2, Megaphone, Upload, FileText } from "lucide-react";
+import {
+  extractContactsFromFile,
+  type ContactFileResult,
+} from "@/lib/csv/contact-file";
 
 import {
   Card,
@@ -63,7 +67,7 @@ const categoryLabel: Record<string, string> = {
   campaign: "Campaign",
 };
 
-type Audience = "all" | "tags";
+type Audience = "all" | "tags" | "upload";
 
 /**
  * The settings the API applies when a field is omitted, as the form's starting
@@ -109,6 +113,10 @@ export function CampaignForm() {
   const [variables, setVariables] = useState<Record<string, string>>({});
   const [audience, setAudience] = useState<Audience>("all");
   const [selectedTags, setSelectedTags] = useState<string[]>([]);
+  // Parsed result of an uploaded contact list (CSV / TSV / vCard).
+  const [upload, setUpload] = useState<ContactFileResult | null>(null);
+  const [uploadName, setUploadName] = useState<string>("");
+  const [uploadError, setUploadError] = useState<string>("");
   const [settings, setSettings] = useState(INITIAL_SETTINGS);
   const [creating, setCreating] = useState(false);
 
@@ -132,7 +140,15 @@ export function CampaignForm() {
           setTypes(typesBody);
           setCallTypeId((prev) => prev ?? typesBody.callTypes?.[0]?.id ?? null);
         }
-        if (contactsRes.ok) setContacts(contactsBody.data ?? []);
+        if (contactsRes.ok) {
+          const loaded: Contact[] = contactsBody.data ?? [];
+          setContacts(loaded);
+          // With no contacts yet, "Everyone" and "By tag" are both empty, so
+          // default straight to Upload — the whole point is not having to add
+          // contacts one by one first.
+          const anyCallable = loaded.some((c) => !c.do_not_call && c.phone?.trim());
+          if (!anyCallable) setAudience("upload");
+        }
       } catch {
         if (!cancelled) toast.error("Couldn't load this page. Try refreshing.");
       } finally {
@@ -157,10 +173,53 @@ export function CampaignForm() {
   const taggedCount = callable.filter((c) =>
     (c.tags ?? []).some((t) => selectedTags.includes(t))
   ).length;
-  const audienceCount = audience === "all" ? callable.length : taggedCount;
+  const audienceCount =
+    audience === "all"
+      ? callable.length
+      : audience === "upload"
+        ? (upload?.contacts.length ?? 0)
+        : taggedCount;
 
   function toggleTag(tag: string) {
     setSelectedTags((prev) => (prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag]));
+  }
+
+  async function handleUploadFile(file: File | null) {
+    setUpload(null);
+    setUploadName("");
+    setUploadError("");
+    if (!file) return;
+
+    // Real Excel is a binary zip, not text — parsing it needs a heavyweight,
+    // historically-vulnerable library, so point them at the one-click export
+    // every Excel version supports rather than silently mangling the file.
+    if (/\.xlsx?$/i.test(file.name)) {
+      setUploadError(
+        "Excel files aren't supported directly. In Excel choose File → Save As → CSV, then upload that."
+      );
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("That file is over 5 MB. Split it into smaller lists and upload each.");
+      return;
+    }
+
+    try {
+      const text = await file.text();
+      const result = extractContactsFromFile({ filename: file.name, text });
+      setUploadName(file.name);
+      if (result.contacts.length === 0) {
+        setUploadError(
+          result.phoneColumnFound
+            ? "No usable phone numbers were found in that file."
+            : "Couldn't find a phone number column. Make sure one column is phone numbers (a header like \"Phone\" or \"Mobile\" helps)."
+        );
+        return;
+      }
+      setUpload(result);
+    } catch {
+      setUploadError("That file couldn't be read. Please upload a CSV, TSV, or vCard file.");
+    }
   }
 
   function handleSelectType(id: string) {
@@ -189,6 +248,10 @@ export function CampaignForm() {
     }
     if (audience === "tags" && selectedTags.length === 0) {
       toast.error("Choose at least one tag, or call everyone in your contacts.");
+      return;
+    }
+    if (audience === "upload" && (!upload || upload.contacts.length === 0)) {
+      toast.error("Upload a contact file with at least one valid phone number.");
       return;
     }
     if (audienceCount === 0) {
@@ -232,7 +295,13 @@ export function CampaignForm() {
       const targetsRes = await fetch(`/api/v1/campaigns/${campaignId}/targets`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(audience === "all" ? { all_contacts: true } : { tags: selectedTags }),
+        body: JSON.stringify(
+          audience === "all"
+            ? { all_contacts: true }
+            : audience === "upload"
+              ? { phones: (upload?.contacts ?? []).map((c) => c.phone) }
+              : { tags: selectedTags }
+        ),
       });
       const targetsBody = await targetsRes.json();
 
@@ -410,90 +479,160 @@ export function CampaignForm() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {contacts.length === 0 ? (
-            <div className="rounded-lg border border-dashed p-6 text-center">
-              <Users className="mx-auto mb-2 size-6 text-muted-foreground" aria-hidden="true" />
-              <p className="font-medium">You have no contacts yet</p>
-              <p className="mt-1 text-sm text-muted-foreground">
-                A campaign calls people from your contact book.{" "}
-                <Link href="/dashboard/contacts" className="underline underline-offset-4">
-                  Add or import contacts
-                </Link>{" "}
-                first.
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="grid gap-2 sm:grid-cols-2">
-                <button
-                  type="button"
-                  onClick={() => setAudience("all")}
-                  aria-pressed={audience === "all"}
-                  className={`rounded-lg border p-3 text-left transition-colors ${
-                    audience === "all" ? "border-brand bg-accent/60" : "hover:bg-muted/50"
-                  }`}
-                >
-                  <span className="text-sm font-medium">Everyone in my contacts</span>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {callable.length} {callable.length === 1 ? "person" : "people"} can be called
-                  </p>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setAudience("tags")}
-                  aria-pressed={audience === "tags"}
-                  disabled={allTags.length === 0}
-                  className={`rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
-                    audience === "tags" ? "border-brand bg-accent/60" : "hover:bg-muted/50"
-                  }`}
-                >
-                  <span className="text-sm font-medium">Only people with certain tags</span>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {allTags.length === 0
-                      ? "None of your contacts are tagged yet"
-                      : `${allTags.length} ${allTags.length === 1 ? "tag" : "tags"} to choose from`}
-                  </p>
-                </button>
-              </div>
-
-              {audience === "tags" && allTags.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Tags to include</Label>
-                  <div className="flex flex-wrap gap-2">
-                    {allTags.map((tag) => (
-                      <button
-                        key={tag}
-                        type="button"
-                        onClick={() => toggleTag(tag)}
-                        aria-pressed={selectedTags.includes(tag)}
-                        className={`rounded-4xl border px-3 py-1 text-xs transition-colors ${
-                          selectedTags.includes(tag)
-                            ? "border-brand bg-accent/60 font-medium"
-                            : "hover:bg-muted/50"
-                        }`}
-                      >
-                        {tag}
-                      </button>
-                    ))}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    Anyone with at least one of the chosen tags is included.
-                  </p>
-                </div>
-              )}
-
-              <div className="rounded-lg border bg-muted/30 p-3 text-sm">
-                <p className="font-medium">
-                  {audienceCount} {audienceCount === 1 ? "person" : "people"} will be called
+          <>
+            <div className="grid gap-2 sm:grid-cols-3">
+              <button
+                type="button"
+                onClick={() => setAudience("all")}
+                aria-pressed={audience === "all"}
+                disabled={callable.length === 0}
+                className={`rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  audience === "all" ? "border-brand bg-accent/60" : "hover:bg-muted/50"
+                }`}
+              >
+                <span className="text-sm font-medium">Everyone in my contacts</span>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {callable.length === 0
+                    ? "No contacts yet"
+                    : `${callable.length} ${callable.length === 1 ? "person" : "people"} can be called`}
                 </p>
-                {doNotCallCount > 0 && (
-                  <p className="mt-0.5 text-xs text-muted-foreground">
-                    {doNotCallCount} left out as do not call.
+              </button>
+              <button
+                type="button"
+                onClick={() => setAudience("tags")}
+                aria-pressed={audience === "tags"}
+                disabled={allTags.length === 0}
+                className={`rounded-lg border p-3 text-left transition-colors disabled:cursor-not-allowed disabled:opacity-60 ${
+                  audience === "tags" ? "border-brand bg-accent/60" : "hover:bg-muted/50"
+                }`}
+              >
+                <span className="text-sm font-medium">Only people with certain tags</span>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {allTags.length === 0
+                    ? "None of your contacts are tagged yet"
+                    : `${allTags.length} ${allTags.length === 1 ? "tag" : "tags"} to choose from`}
+                </p>
+              </button>
+              <button
+                type="button"
+                onClick={() => setAudience("upload")}
+                aria-pressed={audience === "upload"}
+                className={`rounded-lg border p-3 text-left transition-colors ${
+                  audience === "upload" ? "border-brand bg-accent/60" : "hover:bg-muted/50"
+                }`}
+              >
+                <span className="text-sm font-medium">Upload a list</span>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  CSV, TSV, or vCard — no need to add contacts first
+                </p>
+              </button>
+            </div>
+
+            {audience === "tags" && allTags.length > 0 && (
+              <div className="space-y-2">
+                <Label>Tags to include</Label>
+                <div className="flex flex-wrap gap-2">
+                  {allTags.map((tag) => (
+                    <button
+                      key={tag}
+                      type="button"
+                      onClick={() => toggleTag(tag)}
+                      aria-pressed={selectedTags.includes(tag)}
+                      className={`rounded-4xl border px-3 py-1 text-xs transition-colors ${
+                        selectedTags.includes(tag)
+                          ? "border-brand bg-accent/60 font-medium"
+                          : "hover:bg-muted/50"
+                      }`}
+                    >
+                      {tag}
+                    </button>
+                  ))}
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  Anyone with at least one of the chosen tags is included.
+                </p>
+              </div>
+            )}
+
+            {audience === "upload" && (
+              <div className="space-y-3">
+                <label
+                  htmlFor="contact-file"
+                  className="flex cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed p-6 text-center transition-colors hover:bg-muted/50"
+                >
+                  <Upload className="mb-2 size-6 text-muted-foreground" aria-hidden="true" />
+                  <span className="text-sm font-medium">Choose a contact file</span>
+                  <span className="mt-1 text-xs text-muted-foreground">
+                    CSV, TSV, text, or vCard (.vcf). Using Excel? Save it as CSV first.
+                  </span>
+                  <input
+                    id="contact-file"
+                    type="file"
+                    accept=".csv,.tsv,.txt,.vcf,text/csv,text/tab-separated-values,text/plain"
+                    className="sr-only"
+                    onChange={(e) => handleUploadFile(e.target.files?.[0] ?? null)}
+                  />
+                </label>
+
+                {uploadName && (
+                  <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                    <FileText className="size-4 shrink-0" aria-hidden="true" />
+                    <span className="truncate">{uploadName}</span>
                   </p>
                 )}
+
+                {uploadError && (
+                  <p className="flex items-start gap-2 text-sm text-destructive">
+                    <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden="true" />
+                    <span>{uploadError}</span>
+                  </p>
+                )}
+
+                {upload && upload.contacts.length > 0 && (
+                  <div className="rounded-lg border border-success/30 bg-success/10 p-3 text-sm">
+                    <p className="font-medium">
+                      {upload.contacts.length} phone{" "}
+                      {upload.contacts.length === 1 ? "number" : "numbers"} ready to call
+                    </p>
+                    {upload.skippedInvalidPhone +
+                      upload.skippedNoPhone +
+                      upload.skippedDuplicate >
+                      0 && (
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        Skipped{" "}
+                        {[
+                          upload.skippedInvalidPhone
+                            ? `${upload.skippedInvalidPhone} without a valid number`
+                            : "",
+                          upload.skippedDuplicate ? `${upload.skippedDuplicate} duplicate` : "",
+                          upload.skippedNoPhone ? `${upload.skippedNoPhone} blank` : "",
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                        .
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                <p className="text-xs text-muted-foreground">
+                  These numbers become this campaign&apos;s call list. Anyone on your do-not-call
+                  list is still skipped automatically.
+                </p>
               </div>
-            </>
-          )}
+            )}
+
+            <div className="rounded-lg border bg-muted/30 p-3 text-sm">
+              <p className="font-medium">
+                {audienceCount} {audienceCount === 1 ? "person" : "people"} will be called
+              </p>
+              {doNotCallCount > 0 && audience !== "upload" && (
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {doNotCallCount} left out as do not call.
+                </p>
+              )}
+            </div>
+          </>
         </CardContent>
       </Card>
 
